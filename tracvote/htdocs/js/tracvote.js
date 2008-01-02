@@ -7,7 +7,7 @@ $(document).ready(function() {
 
       $('#upvote img').attr('src', result[0]);
       $('#downvote img').attr('src', result[1]);
-      $('#votes').empty().prepend(result[2]);
+      $('#votes').attr('title', result[3]).empty().prepend(result[2]);
       $(button).blur();
     });
     return false;

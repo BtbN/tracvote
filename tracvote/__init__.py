@@ -2,7 +2,7 @@ import re
 from trac.core import *
 from trac.config import ListOption
 from trac.env import IEnvironmentSetupParticipant
-from trac.web.api import IRequestFilter, IRequestHandler
+from trac.web.api import IRequestFilter, IRequestHandler, Href
 from trac.web.chrome import ITemplateProvider, add_ctxtnav, add_stylesheet, \
                             add_script, add_warning
 from trac.resource import get_resource_url
@@ -38,15 +38,22 @@ class VoteSystem(Component):
                  +1: ('aupmod.png', 'adowngray.png')}
 
     # Public methods
-    def get_vote_count(self, resource):
-        """Get vote count for a resource."""
+    def get_vote_counts(self, resource):
+        """Get negative, total and positive vote counts and return them in a
+        tuple."""
         resource = self.normalise_resource(resource)
         db = self.env.get_db_cnx()
         cursor = db.cursor()
         cursor.execute('SELECT sum(vote) FROM votes WHERE resource=%s',
                        (resource,))
-        row = cursor.fetchone()
-        return row[0] or 0
+        total = cursor.fetchone()[0] or 0
+        cursor.execute('SELECT sum(vote) FROM votes WHERE vote < 0 AND resource=%s',
+                       (resource,))
+        negative = cursor.fetchone()[0] or 0
+        cursor.execute('SELECT sum(vote) FROM votes WHERE vote > 0 AND resource=%s',
+                       (resource,))
+        positive = cursor.fetchone()[0] or 0
+        return (negative, total, positive)
 
     def get_vote(self, req, resource):
         """Return the current users vote for a resource."""
@@ -102,9 +109,10 @@ class VoteSystem(Component):
             self.set_vote(req, resource, vote)
 
         if req.args.get('js'):
+            body, title = self.format_votes(resource)
             req.send(':'.join((req.href.chrome('vote/' + self.image_map[vote][0]),
                                req.href.chrome('vote/' + self.image_map[vote][1]),
-                               self.str_count(resource))))
+                               body, title)))
         req.redirect(resource)
 
     # IRequestFilter methods
@@ -162,14 +170,10 @@ class VoteSystem(Component):
                             'install by clicking the up-vote/down-vote arrows '
                             'in the context navigation bar.')
                 req.session['shown_vote_message'] = True
-        votes = tag.span(self.str_count(resource), id='votes',
-                         title='Votes for this resource')
+        body, title = self.format_votes(resource)
+        votes = tag.span(body, id='votes', title=title)
         add_stylesheet(req, 'vote/css/tracvote.css')
         add_ctxtnav(req, tag.span(up, votes, down, id='vote'))
-
-    def str_count(self, resource):
-        vote = self.get_vote_count(resource)
-        return '%+i' % vote
 
     def normalise_resource(self, resource):
         if isinstance(resource, basestring):
@@ -179,3 +183,14 @@ class VoteSystem(Component):
                 resource += '/WikiStart'
             return resource
         return get_resource_url(self.env, resource, Href('')).strip('/')
+
+    def format_votes(self, resource):
+        """Return a tuple of (body_text, title_text) describing the votes on a
+        resource."""
+        negative, total, positive = self.get_vote_counts(resource)
+        count_detail = ['%+i' % i for i in (positive, negative) if i]
+        if count_detail:
+            count_detail = ' (%s)' % ', '.join(count_detail)
+        else:
+            count_detail = ''
+        return ('%+i' % total, 'Vote count%s' % count_detail)
