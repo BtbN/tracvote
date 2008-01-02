@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(
-    name='VotePlugin',
+    name='TracVote',
     version='0.1',
     packages=['tracvote'],
 	package_data={'tracvote' : ['htdocs/js/*.js', 'htdocs/css/*.css']},
