@@ -158,7 +158,7 @@ class VoteSystem(Component):
         vote = self.get_vote(req, resource)
         up = tag.img(src=req.href.chrome('vote/' + self.image_map[vote][0]))
         down = tag.img(src=req.href.chrome('vote/' + self.image_map[vote][1]))
-        if 'VOTE_MODIFY' in req.perm:
+        if 'VOTE_MODIFY' in req.perm and get_reporter_id(req) != 'anonymous':
             down = tag.a(down, id='downvote', href=req.href.vote('down', resource),
                          title='Down-vote')
             up = tag.a(up, id='upvote', href=req.href.vote('up', resource),
@@ -171,9 +171,9 @@ class VoteSystem(Component):
                             'in the context navigation bar.')
                 req.session['shown_vote_message'] = True
         body, title = self.format_votes(resource)
-        votes = tag.span(body, id='votes', title=title)
+        votes = tag.span(body, id='votes')
         add_stylesheet(req, 'vote/css/tracvote.css')
-        add_ctxtnav(req, tag.span(up, votes, down, id='vote'))
+        add_ctxtnav(req, tag.span(up, votes, down, id='vote', title=title))
 
     def normalise_resource(self, resource):
         if isinstance(resource, basestring):
