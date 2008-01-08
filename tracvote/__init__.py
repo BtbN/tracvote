@@ -4,7 +4,7 @@ from trac.config import ListOption
 from trac.env import IEnvironmentSetupParticipant
 from trac.web.api import IRequestFilter, IRequestHandler, Href
 from trac.web.chrome import ITemplateProvider, add_ctxtnav, add_stylesheet, \
-                            add_script, add_warning
+                            add_script, add_notice
 from trac.resource import get_resource_url
 from trac.db import DatabaseManager, Table, Column
 from trac.perm import IPermissionRequestor
@@ -166,9 +166,9 @@ class VoteSystem(Component):
             add_script(req, 'vote/js/tracvote.js')
             shown = req.session.get('shown_vote_message')
             if not shown:
-                add_warning(req, 'You can vote for resources on this Trac '
-                            'install by clicking the up-vote/down-vote arrows '
-                            'in the context navigation bar.')
+                add_notice(req, 'You can vote for resources on this Trac '
+                           'install by clicking the up-vote/down-vote arrows '
+                           'in the context navigation bar.')
                 req.session['shown_vote_message'] = True
         body, title = self.format_votes(resource)
         votes = tag.span(body, id='votes')
