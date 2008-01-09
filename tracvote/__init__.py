@@ -169,7 +169,7 @@ class VoteSystem(Component):
                 add_notice(req, 'You can vote for resources on this Trac '
                            'install by clicking the up-vote/down-vote arrows '
                            'in the context navigation bar.')
-                req.session['shown_vote_message'] = True
+                req.session['shown_vote_message'] = '1'
         body, title = self.format_votes(resource)
         votes = tag.span(body, id='votes')
         add_stylesheet(req, 'vote/css/tracvote.css')
