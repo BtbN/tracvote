@@ -118,18 +118,15 @@ class VoteSystem(Component):
 
     # IRequestFilter methods
     def pre_process_request(self, req, handler):
-        if 'VOTE_VIEW' not in req.perm:
-            return handler
-
-        for path in self.voteable_paths:
-            if re.match(path, req.path_info):
-                self.render_voter(req)
-                break
-
         return handler
 
     def post_process_request(self, req, template, data, content_type):
-        return (template, data, content_type)
+        if 'VOTE_VIEW' in req.perm:
+            for path in self.voteable_paths:
+                if re.match(path, req.path_info):
+                    self.render_voter(req)
+                    break
+        return template, data, content_type
 
     # IEnvironmentSetupParticipant methods
     def environment_created(self):
@@ -142,6 +139,7 @@ class VoteSystem(Component):
             cursor.fetchone()
             return False
         except:
+            cursor.rollback()
             return True
 
     def upgrade_environment(self, db):
@@ -174,7 +172,8 @@ class VoteSystem(Component):
         body, title = self.format_votes(resource)
         votes = tag.span(body, id='votes')
         add_stylesheet(req, 'vote/css/tracvote.css')
-        add_ctxtnav(req, tag.span(up, votes, down, id='vote', title=title))
+        elm = tag.span(up, votes, down, id='vote', title=title)
+        req.chrome.setdefault('ctxtnav', []).insert(0, elm)
 
     def normalise_resource(self, resource):
         if isinstance(resource, basestring):
