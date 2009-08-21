@@ -135,11 +135,11 @@ class VoteSystem(Component):
     def environment_needs_upgrade(self, db):
         cursor = db.cursor()
         try:
-            cursor.execute("SELECT COUNT(*) FROM VOTES")
+            cursor.execute("select count(*) FROM votes")
             cursor.fetchone()
             return False
         except:
-            cursor.rollback()
+            cursor.connection.rollback()
             return True
 
     def upgrade_environment(self, db):
