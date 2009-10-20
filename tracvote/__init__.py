@@ -37,7 +37,8 @@ class VoteSystem(Component):
                   0: ('aupgray.png', 'adowngray.png'),
                  +1: ('aupmod.png', 'adowngray.png')}
 
-    # Public methods
+    ### public methods
+
     def get_vote_counts(self, resource):
         """Get negative, total and positive vote counts and return them in a
         tuple."""
@@ -79,11 +80,12 @@ class VoteSystem(Component):
                            (resource, get_reporter_id(req), vote))
         db.commit()
 
-    # IPermissionRequestor methods
+    # IPermissionRequestor method
     def get_permission_actions(self):
         return ['VOTE_VIEW', 'VOTE_MODIFY']
 
-    # ITemplateProvider methods
+    ### ITemplateProvider methods
+
     def get_templates_dirs(self):
         return []
         #resource_filename(__name__, 'templates')]
@@ -91,7 +93,8 @@ class VoteSystem(Component):
     def get_htdocs_dirs(self):
         return [('vote', resource_filename(__name__, 'htdocs'))]
 
-    # IRequestHandler methods
+    ### IRequestHandler methods
+
     def match_request(self, req):
         return 'VOTE_VIEW' in req.perm and self.path_match.match(req.path_info)
 
@@ -116,7 +119,8 @@ class VoteSystem(Component):
                                body, title)))
         req.redirect(resource)
 
-    # IRequestFilter methods
+    ### IRequestFilter methods
+
     def pre_process_request(self, req, handler):
         return handler
 
@@ -128,7 +132,8 @@ class VoteSystem(Component):
                     break
         return template, data, content_type
 
-    # IEnvironmentSetupParticipant methods
+    ### IEnvironmentSetupParticipant methods
+
     def environment_created(self):
         self.upgrade_environment(self.env.get_db_cnx())
 
@@ -151,7 +156,8 @@ class VoteSystem(Component):
                 cursor.execute(stmt)
         db.commit()
 
-    # Internal methods
+    ### internal methods
+
     def render_voter(self, req):
         resource = self.normalise_resource(req.path_info)
         vote = self.get_vote(req, resource)
