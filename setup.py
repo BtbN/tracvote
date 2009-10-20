@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='TracVote',
-    version='0.1.1',
+    version='0.1.2',
     packages=['tracvote'],
 	package_data={'tracvote' : ['htdocs/*.*', 'htdocs/js/*.js', 'htdocs/css/*.css']},
     author='Alec Thomas',

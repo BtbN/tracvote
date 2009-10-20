@@ -80,6 +80,37 @@ class VoteSystem(Component):
                            (resource, get_reporter_id(req), vote))
         db.commit()
 
+    def get_total_vote_count(self, realm):
+        """Return the total vote count for a realm, like 'ticket'"""
+        db = self.env.get_db_cnx()
+        cursor = db.cursor()
+        cursor.execute('SELECT sum(vote) FROM votes WHERE resource LIKE %s',
+                       (realm + '%',))
+        total = cursor.fetchone()[0] or 0
+        cursor.execute('SELECT sum(vote) FROM votes WHERE vote < 0 AND resource LIKE %s',
+                       (realm + '%',))
+        negative = cursor.fetchone()[0] or 0
+        cursor.execute('SELECT sum(vote) FROM votes WHERE vote > 0 AND resource=%s',
+                       (realm + '%',))
+        positive = cursor.fetchone()[0] or 0
+        return (negative, total, positive)
+        
+    def get_realm_votes(self, realm):
+        """return a dictionary of vote count for a realm"""
+        db = self.env.get_db_cnx()
+        cursor = db.cursor()
+        cursor.execute('SELECT resource FROM votes WHERE resource LIKE %s',
+                       (realm + '%',))
+        resources = set([i[0] for i in cursor.fetchall()])
+        votes = {}
+        for resource in resources:
+            votes[resource] = self.get_vote_counts(resource)
+        return votes
+
+    def get_max_votes(self, realm):
+        votes = self.get_realm_votes(realm)
+        return max([i[1] for i in votes.values()])
+
     # IPermissionRequestor method
     def get_permission_actions(self):
         return ['VOTE_VIEW', 'VOTE_MODIFY']
