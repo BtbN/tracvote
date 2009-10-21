@@ -109,6 +109,8 @@ class VoteSystem(Component):
 
     def get_max_votes(self, realm):
         votes = self.get_realm_votes(realm)
+        if not votes:
+            return 0
         return max([i[1] for i in votes.values()])
 
     # IPermissionRequestor method
