@@ -1,0 +1,24 @@
+-- ## Popular Voted Tickets ## --
+
+-- The following is taken from the Edgewall
+-- Trac site: http://trac.edgewall.org/report/34
+-- See also: http://trac-hacks.org/ticket/3655
+
+-- Tickets ordered by number of votes (> 1)
+-- You must be [/prefs registered] to vote.
+
+SELECT p.value AS __color__,
+   t.type AS type, id AS ticket, sum(v.vote) as votes, summary, component, version,
+milestone,
+   time AS created,
+   changetime AS _changetime, description AS _description,
+   reporter AS _reporter
+  FROM ticket t, enum p, votes v
+  WHERE status <> 'closed'
+AND p.name = t.priority AND p.type = 'priority'
+AND v.resource = 'ticket/' || id
+GROUP BY id, summary, component, version, milestone, t.type, owner,
+time,
+  changetime, description, reporter, p.value, status
+HAVING sum(v.vote) > 1
+ ORDER BY votes DESC, milestone, t.type, time
