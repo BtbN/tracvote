@@ -194,8 +194,10 @@ class VoteSystem(Component):
     def render_voter(self, req):
         resource = self.normalise_resource(req.path_info)
         vote = self.get_vote(req, resource)
-        up = tag.img(src=req.href.chrome('vote/' + self.image_map[vote][0]))
-        down = tag.img(src=req.href.chrome('vote/' + self.image_map[vote][1]))
+        up = tag.img(src=req.href.chrome('vote/' + self.image_map[vote][0]), 
+                     alt='Up-vote')
+        down = tag.img(src=req.href.chrome('vote/' + self.image_map[vote][1]), 
+                     alt='Down-vote')         
         if 'VOTE_MODIFY' in req.perm and get_reporter_id(req) != 'anonymous':
             down = tag.a(down, id='downvote', href=req.href.vote('down', resource),
                          title='Down-vote')
