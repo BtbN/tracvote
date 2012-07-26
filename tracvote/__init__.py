@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import re
 from trac.core import *
 from trac.config import ListOption
@@ -153,8 +155,8 @@ class VoteSystem(Component):
             if isinstance(content, unicode):
                 content = content.encode('utf-8')            
             req.send(content)
-            
-        req.redirect(resource)
+
+        req.redirect(req.href(resource))
 
     ### IRequestFilter methods
 
