@@ -7,7 +7,7 @@ from genshi.builder import tag
 from pkg_resources import resource_filename
 
 from trac.config import ListOption
-from trac.core import Component, implements
+from trac.core import Component, TracError, implements
 from trac.db import DatabaseManager, Table, Column
 from trac.env import IEnvironmentSetupParticipant
 from trac.perm import IPermissionRequestor
@@ -208,13 +208,12 @@ class VoteSystem(Component):
 
     def environment_needs_upgrade(self, db):
         cursor = db.cursor()
-        try:
-            cursor.execute('SELECT COUNT(*) FROM votes')
-            cursor.fetchone()
+        # Care for pre-tracvote-0.1.4 installations. 
+        dburi = self.config.get('trac', 'database') 
+        tables = self._get_tables(dburi, cursor) 
+        if 'votes' in tables:
             return False
-        except:
-            cursor.connection.rollback()
-            return True
+        return True
 
     def upgrade_environment(self, db):
         db_backend, _ = DatabaseManager(self.env)._get_connector()
@@ -273,3 +272,26 @@ class VoteSystem(Component):
         else:
             count_detail = ''
         return ('%+i' % total, 'Vote count%s' % count_detail)
+
+    def _get_tables(self, dburi, cursor): 
+        """Code from TracMigratePlugin by Jun Omae (see tracmigrate.admin).""" 
+        if dburi.startswith('sqlite:'): 
+            sql = """ 
+                SELECT name 
+                  FROM sqlite_master 
+                 WHERE type='table' 
+                   AND NOT name='sqlite_sequence' 
+            """ 
+        elif dburi.startswith('postgres:'): 
+            sql = """ 
+                SELECT tablename 
+                  FROM pg_tables 
+                 WHERE schemaname = ANY (current_schemas(false)) 
+            """ 
+        elif dburi.startswith('mysql:'): 
+            sql = "SHOW TABLES" 
+        else: 
+            raise TracError('Unsupported database type "%s"' 
+                            % dburi.split(':')[0]) 
+        cursor.execute(sql) 
+        return sorted([row[0] for row in cursor])
