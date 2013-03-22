@@ -115,9 +115,10 @@ class VoteSystem(Component):
             return 0
         return max([i[1] for i in votes.values()])
 
-    # IPermissionRequestor method
+    ### IPermissionRequestor method
     def get_permission_actions(self):
-        return ['VOTE_VIEW', 'VOTE_MODIFY']
+        action = 'VOTE_VIEW'
+        return [('VOTE_MODIFY', [action]), action]
 
     ### ITemplateProvider methods
 
