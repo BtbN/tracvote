@@ -1,19 +1,21 @@
 # -*- coding: utf-8 -*-
 
 import re
-from trac.core import *
-from trac.config import ListOption
-from trac.env import IEnvironmentSetupParticipant
-from trac.web.api import IRequestFilter, IRequestHandler, Href
-from trac.web.chrome import ITemplateProvider, add_ctxtnav, add_stylesheet, \
-                            add_script, add_notice
-from trac.resource import get_resource_url
-from trac.db import DatabaseManager, Table, Column
-from trac.perm import IPermissionRequestor
-from trac.util import get_reporter_id
+
 from genshi import Markup, Stream
 from genshi.builder import tag
 from pkg_resources import resource_filename
+
+from trac.config import ListOption
+from trac.core import Component, implements
+from trac.db import DatabaseManager, Table, Column
+from trac.env import IEnvironmentSetupParticipant
+from trac.perm import IPermissionRequestor
+from trac.resource import get_resource_url
+from trac.util import get_reporter_id
+from trac.web.api import IRequestFilter, IRequestHandler, Href
+from trac.web.chrome import ITemplateProvider, add_ctxtnav, add_stylesheet
+from trac.web.chrome import add_script, add_notice
 
 
 class VoteSystem(Component):
@@ -39,21 +41,31 @@ class VoteSystem(Component):
                   0: ('aupgray.png', 'adowngray.png'),
                  +1: ('aupmod.png', 'adowngray.png')}
 
-    ### public methods
+    ### Public methods
 
     def get_vote_counts(self, resource):
         """Get negative, total and positive vote counts and return them in a
-        tuple."""
+        tuple.
+        """
         resource = self.normalise_resource(resource)
         db = self.env.get_db_cnx()
         cursor = db.cursor()
         cursor.execute('SELECT sum(vote) FROM votes WHERE resource=%s',
                        (resource,))
         total = cursor.fetchone()[0] or 0
-        cursor.execute('SELECT sum(vote) FROM votes WHERE vote < 0 AND resource=%s',
-                       (resource,))
+        cursor.execute("""
+            SELECT sum(vote)
+              FROM votes
+             WHERE vote < 0
+               AND resource=%s
+        """, (resource,))
         negative = cursor.fetchone()[0] or 0
-        cursor.execute('SELECT sum(vote) FROM votes WHERE vote > 0 AND resource=%s',
+        cursor.execute("""
+            SELECT sum(vote)
+              FROM votes
+             WHERE vote > 0
+               AND resource=%s
+        """,
                        (resource,))
         positive = cursor.fetchone()[0] or 0
         return (negative, total, positive)
@@ -63,8 +75,12 @@ class VoteSystem(Component):
         resource = self.normalise_resource(resource)
         db = self.env.get_db_cnx()
         cursor = db.cursor()
-        cursor.execute('SELECT vote FROM votes WHERE username=%s '
-                       'AND resource = %s', (get_reporter_id(req), resource))
+        cursor.execute("""
+            SELECT vote
+              FROM votes
+             WHERE username=%s
+               AND resource=%s
+        """, (get_reporter_id(req), resource))
         row = cursor.fetchone()
         vote = row and row[0] or 0
         return vote
@@ -74,8 +90,12 @@ class VoteSystem(Component):
         resource = self.normalise_resource(resource)
         db = self.env.get_db_cnx()
         cursor = db.cursor()
-        cursor.execute('DELETE FROM votes WHERE username=%s '
-                       'AND resource = %s', (get_reporter_id(req), resource))
+        cursor.execute("""
+            DELETE
+              FROM votes
+             WHERE username=%s
+               AND resource=%s
+        """, (get_reporter_id(req), resource))
         if vote:
             cursor.execute('INSERT INTO votes (resource, username, vote) '
                            'VALUES (%s, %s, %s)',
@@ -83,22 +103,30 @@ class VoteSystem(Component):
         db.commit()
 
     def get_total_vote_count(self, realm):
-        """Return the total vote count for a realm, like 'ticket'"""
+        """Return the total vote count for a realm, like 'ticket'."""
         db = self.env.get_db_cnx()
         cursor = db.cursor()
         cursor.execute('SELECT sum(vote) FROM votes WHERE resource LIKE %s',
                        (realm + '%',))
         total = cursor.fetchone()[0] or 0
-        cursor.execute('SELECT sum(vote) FROM votes WHERE vote < 0 AND resource LIKE %s',
-                       (realm + '%',))
+        cursor.execute("""
+            SELECT sum(vote)
+              FROM votes
+             WHERE vote < 0
+               AND resource LIKE %s
+        """, (realm + '%',))
         negative = cursor.fetchone()[0] or 0
-        cursor.execute('SELECT sum(vote) FROM votes WHERE vote > 0 AND resource=%s',
-                       (realm + '%',))
+        cursor.execute("""
+            SELECT sum(vote)
+              FROM votes
+             WHERE vote > 0
+               AND resource=%s
+        """, (realm + '%',))
         positive = cursor.fetchone()[0] or 0
         return (negative, total, positive)
         
     def get_realm_votes(self, realm):
-        """return a dictionary of vote count for a realm"""
+        """Return a dictionary of vote count for a realm."""
         db = self.env.get_db_cnx()
         cursor = db.cursor()
         cursor.execute('SELECT resource FROM votes WHERE resource LIKE %s',
@@ -150,9 +178,10 @@ class VoteSystem(Component):
 
         if req.args.get('js'):
             body, title = self.format_votes(resource)
-            content= ':'.join((req.href.chrome('vote/' + self.image_map[vote][0]),
-                               req.href.chrome('vote/' + self.image_map[vote][1]),
-                               body, title))
+            content = ':'.join(
+                          (req.href.chrome('vote/' + self.image_map[vote][0]),
+                           req.href.chrome('vote/' + self.image_map[vote][1]),
+                           body, title))
             if isinstance(content, unicode):
                 content = content.encode('utf-8')            
             req.send(content)
@@ -180,7 +209,7 @@ class VoteSystem(Component):
     def environment_needs_upgrade(self, db):
         cursor = db.cursor()
         try:
-            cursor.execute("select count(*) FROM votes")
+            cursor.execute('SELECT COUNT(*) FROM votes')
             cursor.fetchone()
             return False
         except:
@@ -196,7 +225,7 @@ class VoteSystem(Component):
                 cursor.execute(stmt)
         db.commit()
 
-    ### internal methods
+    ### Internal methods
 
     def render_voter(self, req):
         resource = self.normalise_resource(req.path_info)
@@ -206,7 +235,8 @@ class VoteSystem(Component):
         down = tag.img(src=req.href.chrome('vote/' + self.image_map[vote][1]), 
                      alt='Down-vote')         
         if 'VOTE_MODIFY' in req.perm and get_reporter_id(req) != 'anonymous':
-            down = tag.a(down, id='downvote', href=req.href.vote('down', resource),
+            down = tag.a(down, id='downvote',
+                         href=req.href.vote('down', resource),
                          title='Down-vote')
             up = tag.a(up, id='upvote', href=req.href.vote('up', resource),
                        title='Up-vote')
@@ -226,7 +256,7 @@ class VoteSystem(Component):
     def normalise_resource(self, resource):
         if isinstance(resource, basestring):
             resource = resource.strip('/')
-            # Special-case start page
+            # Special-case: Default TracWiki start page.
             if resource == 'wiki':
                 resource += '/WikiStart'
             return resource
@@ -234,7 +264,8 @@ class VoteSystem(Component):
 
     def format_votes(self, resource):
         """Return a tuple of (body_text, title_text) describing the votes on a
-        resource."""
+        resource.
+        """
         negative, total, positive = self.get_vote_counts(resource)
         count_detail = ['%+i' % i for i in (positive, negative) if i]
         if count_detail:
