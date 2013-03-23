@@ -1,4 +1,15 @@
 # -*- coding: utf-8 -*-
+#
+# Copyright (C) 2008 Alec Thomas <alec@swapoff.org>
+# Copyright (C) 2009 Noah Kantrowitz <noah@coderanger.net>
+# Copyright (C) 2009 Jeff Hammel <jhammel@openplans.org>
+# Copyright (C) 2013 Steffen Hoffmann <hoff.st@web.de>
+# All rights reserved.
+#
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution.
+#
+# Author: Alec Thomas
 
 import re
 
@@ -19,7 +30,7 @@ from trac.web.chrome import add_script, add_notice
 
 
 class VoteSystem(Component):
-    """Allow up and down-voting on Trac resources."""
+    """Allow up- and down-voting on Trac resources."""
 
     implements(ITemplateProvider, IRequestFilter, IRequestHandler,
                IEnvironmentSetupParticipant, IPermissionRequestor)
