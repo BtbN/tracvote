@@ -135,7 +135,7 @@ class VoteSystem(Component):
         """, (realm + '%',))
         positive = cursor.fetchone()[0] or 0
         return (negative, total, positive)
-        
+
     def get_realm_votes(self, realm):
         """Return a dictionary of vote count for a realm."""
         db = self.env.get_db_cnx()
