@@ -12,6 +12,7 @@
 # Author: Alec Thomas
 
 import re
+from fnmatch import fnmatchcase
 
 from genshi import Markup, Stream
 from genshi.builder import tag
@@ -207,7 +208,7 @@ class VoteSystem(Component):
     def post_process_request(self, req, template, data, content_type):
         if 'VOTE_VIEW' in req.perm:
             for path in self.voteable_paths:
-                if re.match(path, req.path_info):
+                if fnmatchcase(req.path_info, path):
                     self.render_voter(req)
                     break
         return template, data, content_type
