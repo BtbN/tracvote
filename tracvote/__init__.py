@@ -23,13 +23,14 @@ from trac.core import Component, TracError, implements
 from trac.db import DatabaseManager, Table, Column
 from trac.env import IEnvironmentSetupParticipant
 from trac.perm import IPermissionRequestor
-from trac.resource import Resource, ResourceSystem, get_resource_url
+from trac.resource import Resource, ResourceSystem, get_resource_description
+from trac.resource import get_resource_url
 from trac.util import get_reporter_id
 from trac.util.text import to_unicode
 from trac.web.api import IRequestFilter, IRequestHandler, Href
 from trac.web.chrome import ITemplateProvider, add_ctxtnav, add_stylesheet
 from trac.web.chrome import add_script, add_notice
-from trac.wiki.api import IWikiChangeListener
+from trac.wiki.api import IWikiChangeListener, IWikiMacroProvider, parse_args
 
 
 # Provide `resource_exists`, that has been backported to Trac 0.11.8 only.
@@ -110,7 +111,7 @@ class VoteSystem(Component):
 
     implements(ITemplateProvider, IRequestFilter, IRequestHandler,
                IEnvironmentSetupParticipant, IPermissionRequestor,
-               IWikiChangeListener)
+               IWikiChangeListener, IWikiMacroProvider)
 
     image_map = {-1: ('aupgray.png', 'adownmod.png'),
                   0: ('aupgray.png', 'adowngray.png'),
@@ -147,6 +148,26 @@ class VoteSystem(Component):
         doc='List of URL paths to allow voting on. Globs are supported.')
 
     ### Public methods
+
+    def get_top_voted(self, req, realm=None, top=10):
+        """Return resources ordered top-down by vote count."""
+        args = []
+        if realm:
+            args.append(realm)
+        if top:
+            args.append(top)
+        db = self.env.get_db_cnx()
+        cursor = db.cursor()
+        cursor.execute("""
+            SELECT realm,resource_id,SUM(vote) AS count
+              FROM votes%s
+             GROUP by realm,resource_id
+             ORDER by count DESC,resource_id%s
+        """ % (realm and ' WHERE realm=%s' or '', top and ' LIMIT %s' or ''),
+            args)
+        rows = cursor.fetchall()
+        for row in rows:
+            yield row
 
     def get_vote_counts(self, resource):
         """Get negative, total and positive vote counts and return them in a
@@ -241,6 +262,21 @@ class VoteSystem(Component):
                AND resource_id=%%s%s
         """ % (resource.version and ' AND version=%s' or ''), args)
         db.commit()
+
+    def get_votes(self, req, resource=None):
+        """Return most recent votes, optionally only for one resource."""
+        args = resource and (resource.realm, to_unicode(resource.id)) or []
+        db = self.env.get_db_cnx()
+        cursor = db.cursor()
+        cursor.execute("""
+            SELECT realm,resource_id,vote,username,changetime
+              FROM votes
+             WHERE changetime is not NULL%s
+             ORDER BY changetime DESC
+        """ % (resource and ' AND realm=%s AND resource_id=%s' or ''), args)
+        rows = cursor.fetchall()
+        for row in rows:
+            yield row
 
     def get_total_vote_count(self, realm):
         """Return the total vote count for a realm, like 'ticket'."""
@@ -369,6 +405,52 @@ class VoteSystem(Component):
         # Work around issue t:#11138.
         page.resource.id = page.name
         self.reparent_vote(page.resource, old_name)
+
+    ### IWikiMacroProvider methods
+    def get_macros(self):
+        yield 'LastVoted'
+        yield 'TopVoted'
+        yield 'VoteList'
+
+    def get_macro_description(self, name):
+        if name == 'LastVoted':
+            return "Show most recently voted resources."
+        elif name == 'TopVoted':
+            return "Show listing of voted resources ordered by total score."
+        elif name == 'VoteList':
+            return "Show listing of most recent votes for a resource."
+
+    def expand_macro(self, formatter, name, content):
+        env = formatter.env
+        req = formatter.req
+        if not 'VOTE_VIEW' in req.perm:
+            return
+        if not content:
+            args = []
+            kw = {}
+        else:
+            args, kw = parse_args(content)
+
+        if name == 'LastVoted':
+            return
+
+        elif name == 'TopVoted':
+            realm = kw.get('realm')
+            top = kw.get('top')
+            lst = tag.ul()
+            for i in self.get_top_voted(req, realm=realm, top=top):
+                if 'up-only' in args and i[2] < 1:
+                    break
+                resource = Resource(i[0], i[1])
+                lst(tag.li(tag.a(get_resource_description(env, resource),
+                                 href=get_resource_url(env, resource,
+                                                       formatter.href),
+                                 title='compact' in args and i[2] or None),
+                           (not 'compact' in args and ' (%+i)' % i[2] or '')))
+            return lst
+
+        elif name == 'VoteList':
+            return
 
     ### IEnvironmentSetupParticipant methods
 
