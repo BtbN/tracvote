@@ -402,7 +402,8 @@ class VoteSystem(Component):
                      alt='Up-vote')
         down = tag.img(src=req.href.chrome('vote/' + self.image_map[vote][1]),
                      alt='Down-vote')
-        if 'VOTE_MODIFY' in req.perm and get_reporter_id(req) != 'anonymous':
+        if not 'action' in req.args and 'VOTE_MODIFY' in req.perm and \
+                get_reporter_id(req) != 'anonymous':
             down = tag.a(down, id='downvote',
                          href=req.href.vote('down', path),
                          title='Down-vote')
