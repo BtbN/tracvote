@@ -1,8 +1,14 @@
 $(document).ready(function() {
   $('#upvote, #downvote').click(function() {
-  var button = this;
+    var button = this;
+    var href;
+    if (this.href.indexOf('?') === -1) {
+      href = this.href + '?js=1';
+    } else {
+      href = this.href + '&js=1';
+    }
 
-    $.get(this.href + '?js=1', function(result) {
+    $.get(href, function(result) {
       result = result.split(':');
 
       $('#upvote img').attr('src', result[0]);

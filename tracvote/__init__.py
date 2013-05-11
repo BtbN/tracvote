@@ -360,10 +360,21 @@ class VoteSystem(Component):
         vote = vote == 'up' and +1 or -1
         old_vote = self.get_vote(req, resource)
 
-        if old_vote == vote:
-            vote = 0
-            self.set_vote(req, resource, 0)
+        # Protect against CSRF attacks: Validate the token like done in Trac
+        # core for all POST requests with a content-type corresponding
+        # to form submissions.
+        msg = ''
+        if req.args.get('token') != req.form_token:
+            if self.env.secure_cookies and req.scheme == 'http':
+                msg = ("Secure cookies are enabled, you must use https for "
+                       "your requests.")
+            else:
+                msg = ("Do you have cookies enabled?")
+            raise TracError(msg)
         else:
+            if old_vote == vote:
+                # Second click on same icon revokes previous vote.
+                vote = 0
             self.set_vote(req, resource, vote)
 
         if req.args.get('js'):
@@ -581,13 +592,15 @@ class VoteSystem(Component):
         up = tag.img(src=req.href.chrome('vote/' + self.image_map[vote][0]),
                      alt='Up-vote')
         down = tag.img(src=req.href.chrome('vote/' + self.image_map[vote][1]),
-                     alt='Down-vote')
+                       alt='Down-vote')
         if not 'action' in req.args and 'VOTE_MODIFY' in req.perm and \
                 get_reporter_id(req) != 'anonymous':
             down = tag.a(down, id='downvote',
-                         href=req.href.vote('down', path),
+                         href=req.href.vote('down', path,
+                                            token=req.form_token),
                          title='Down-vote')
-            up = tag.a(up, id='upvote', href=req.href.vote('up', path),
+            up = tag.a(up, id='upvote',
+                       href=req.href.vote('up', path, token=req.form_token),
                        title='Up-vote')
             add_script(req, 'vote/js/tracvote.js')
             shown = req.session.get('shown_vote_message')
