@@ -7,13 +7,15 @@
 # This software is licensed as described in the file COPYING, which
 # you should have received as part of this distribution.
 
-from setuptools import setup
+from setuptools import find_packages, setup
 
 setup(
     name='TracVote',
-    version='0.1.5',
-    packages=['tracvote'],
-    package_data={'tracvote' : ['htdocs/*.*', 'htdocs/js/*.js', 'htdocs/css/*.css']},
+    version='0.2',
+    packages=find_packages(exclude=['*.tests']),
+    package_data={
+        'tracvote': ['htdocs/*.*', 'htdocs/js/*.js', 'htdocs/css/*.css']
+    },
     author='Alec Thomas',
     maintainer = 'Ryan J Ollos',
     maintainer_email = 'ryano@physiosonics.com',

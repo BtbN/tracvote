@@ -23,11 +23,84 @@ from trac.core import Component, TracError, implements
 from trac.db import DatabaseManager, Table, Column
 from trac.env import IEnvironmentSetupParticipant
 from trac.perm import IPermissionRequestor
-from trac.resource import get_resource_url
+from trac.resource import Resource, ResourceSystem, get_resource_url
 from trac.util import get_reporter_id
+from trac.util.text import to_unicode
 from trac.web.api import IRequestFilter, IRequestHandler, Href
 from trac.web.chrome import ITemplateProvider, add_ctxtnav, add_stylesheet
 from trac.web.chrome import add_script, add_notice
+
+# Provide `resource_exists`, that has been backported to Trac 0.11.8 only.
+try:
+    from trac.resource import resource_exists
+    resource_check = True
+except ImportError:
+    def resource_exists(env, resource):
+        """Checks for resource existence without actually instantiating a
+        model.
+
+        :return: `True`, if the resource exists, `False` if it doesn't
+        and `None` in case no conclusion could be made (i.e. when
+        `IResourceManager.resource_exists` is not implemented).
+        """
+        manager = ResourceSystem(env).get_resource_manager(resource.realm)
+        if manager and hasattr(manager, 'resource_exists'):
+            return manager.resource_exists(resource)
+        elif resource.id is None:
+            return False
+    resource_check = False
+
+
+def get_versioned_resource(env, resource):
+    """Find the current version for a Trac resource.
+
+    Because versioned resources with no version value default to 'latest',
+    the current version has to be retrieved separately.
+    """
+    realm = resource.realm
+    if realm == 'ticket':
+        db = env.get_db_cnx()
+        cursor = db.cursor()
+        cursor.execute("""
+            SELECT SUM(c.change) FROM (
+                SELECT 1 as change
+                  FROM ticket_change
+                 WHERE ticket=%s
+                 GROUP BY time) AS c
+            """, (resource.id,))
+        tkt_changes = cursor.fetchone()
+        resource.version = tkt_changes and tkt_changes[0] or 0
+    elif realm == 'wiki':
+        db = env.get_db_cnx()
+        cursor = db.cursor()
+        cursor.execute("""
+            SELECT version
+              FROM wiki
+             WHERE name=%s
+             ORDER BY version DESC LIMIT 1
+            """, (resource.id,))
+        page_version = cursor.fetchone()
+        resource.version = page_version and int(page_version[0]) or 0
+    return resource
+
+def resource_from_path(env, path):
+    """Find realm and resource ID from resource URL.
+
+    Assuming simple resource paths to convert to Trac resource identifiers.
+    """
+    if isinstance(path, basestring):
+        path = path.strip('/')
+        # Special-case: Default TracWiki start page.
+        if path == 'wiki':
+            path += '/WikiStart'
+    for realm in ResourceSystem(env).get_known_realms():
+        if path.startswith(realm):
+            resource_id = re.sub(realm, '', path).lstrip('/')
+            resource = Resource(realm, resource_id)
+            if not resource_check:
+                return resource
+            elif resource_exists(env, resource) in (None, True):
+                return get_versioned_resource(env, resource)
 
 
 class VoteSystem(Component):
@@ -36,22 +109,39 @@ class VoteSystem(Component):
     implements(ITemplateProvider, IRequestFilter, IRequestHandler,
                IEnvironmentSetupParticipant, IPermissionRequestor)
 
-    voteable_paths = ListOption('vote', 'paths', '/wiki*,/ticket*',
-        doc='List of URL paths to allow voting on. Globs are supported.')
-
-    schema = [
-        Table('votes', key=('resource', 'username', 'vote'))[
-            Column('resource'),
-            Column('username'),
-            Column('vote', 'int'),
-            ]
-        ]
-
-    path_match = re.compile(r'/vote/(up|down)/(.*)')
-
     image_map = {-1: ('aupgray.png', 'adownmod.png'),
                   0: ('aupgray.png', 'adowngray.png'),
                  +1: ('aupmod.png', 'adowngray.png')}
+
+    path_match = re.compile(r'/vote/(up|down)/(.*)')
+
+    schema = [
+        Table('votes', key=('realm', 'resource_id', 'username', 'vote'))[
+            Column('realm'),
+            Column('resource_id'),
+            Column('version', 'int'),
+            Column('username'),
+            Column('vote', 'int'),
+            Column('time', type='int64'),
+            Column('changetime', type='int64'),
+            ]
+        ]
+    # Database schema version identifier, used for automatic upgrades.
+    schema_version = 2
+
+    # Default database values
+    #(table, (column1, column2), ((row1col1, row1col2), (row2col1, row2col2)))
+    db_data = (
+        ('permission',
+            ('username', 'action'),
+                (('anonymous', 'VOTE_VIEW'),
+                 ('authenticated', 'VOTE_MODIFY'))),
+        ('system',
+            ('name', 'value'),
+                (('vote_version', str(schema_version)),)))
+
+    voteable_paths = ListOption('vote', 'paths', '/wiki*,/ticket*',
+        doc='List of URL paths to allow voting on. Globs are supported.')
 
     ### Public methods
 
@@ -59,59 +149,65 @@ class VoteSystem(Component):
         """Get negative, total and positive vote counts and return them in a
         tuple.
         """
-        resource = self.normalise_resource(resource)
         db = self.env.get_db_cnx()
         cursor = db.cursor()
-        cursor.execute('SELECT sum(vote) FROM votes WHERE resource=%s',
-                       (resource,))
+        cursor.execute("""
+            SELECT sum(vote)
+              FROM votes
+             WHERE realm=%s
+               AND resource_id=%s
+        """, (resource.realm, resource.id))
         total = cursor.fetchone()[0] or 0
         cursor.execute("""
             SELECT sum(vote)
               FROM votes
              WHERE vote < 0
-               AND resource=%s
-        """, (resource,))
+               AND realm=%s
+               AND resource_id=%s
+        """, (resource.realm, resource.id))
         negative = cursor.fetchone()[0] or 0
         cursor.execute("""
             SELECT sum(vote)
               FROM votes
              WHERE vote > 0
-               AND resource=%s
-        """,
-                       (resource,))
+               AND realm=%s
+               AND resource_id=%s
+        """, (resource.realm, to_unicode(resource.id)))
         positive = cursor.fetchone()[0] or 0
         return (negative, total, positive)
 
     def get_vote(self, req, resource):
         """Return the current users vote for a resource."""
-        resource = self.normalise_resource(resource)
         db = self.env.get_db_cnx()
         cursor = db.cursor()
         cursor.execute("""
             SELECT vote
               FROM votes
              WHERE username=%s
-               AND resource=%s
-        """, (get_reporter_id(req), resource))
+               AND realm=%s
+               AND resource_id=%s
+        """, (get_reporter_id(req), resource.realm, to_unicode(resource.id)))
         row = cursor.fetchone()
         vote = row and row[0] or 0
         return vote
 
     def set_vote(self, req, resource, vote):
         """Vote for a resource."""
-        resource = self.normalise_resource(resource)
         db = self.env.get_db_cnx()
         cursor = db.cursor()
         cursor.execute("""
             DELETE
               FROM votes
              WHERE username=%s
-               AND resource=%s
-        """, (get_reporter_id(req), resource))
+               AND realm=%s
+               AND resource_id=%s
+        """, (get_reporter_id(req), resource.realm, to_unicode(resource.id)))
         if vote:
-            cursor.execute('INSERT INTO votes (resource, username, vote) '
-                           'VALUES (%s, %s, %s)',
-                           (resource, get_reporter_id(req), vote))
+            cursor.execute(
+                'INSERT INTO votes (realm,resource_id,version,username,vote) '
+                'VALUES (%s,%s,%s,%s,%s)',
+                (resource.realm, to_unicode(resource.id), resource.version,
+                 get_reporter_id(req), vote))
         db.commit()
 
     def get_total_vote_count(self, realm):
@@ -177,8 +273,8 @@ class VoteSystem(Component):
     def process_request(self, req):
         req.perm.require('VOTE_MODIFY')
         match = self.path_match.match(req.path_info)
-        vote, resource = match.groups()
-        resource = self.normalise_resource(resource)
+        vote, path = match.groups()
+        resource = resource_from_path(self.env, path)
         vote = vote == 'up' and +1 or -1
         old_vote = self.get_vote(req, resource)
 
@@ -195,10 +291,10 @@ class VoteSystem(Component):
                            req.href.chrome('vote/' + self.image_map[vote][1]),
                            body, title))
             if isinstance(content, unicode):
-                content = content.encode('utf-8')            
+                content = content.encode('utf-8')
             req.send(content)
 
-        req.redirect(req.href(resource))
+        req.redirect(get_resource_url(self.env, resource, req.href))
 
     ### IRequestFilter methods
 
@@ -208,7 +304,8 @@ class VoteSystem(Component):
     def post_process_request(self, req, template, data, content_type):
         if 'VOTE_VIEW' in req.perm:
             for path in self.voteable_paths:
-                if fnmatchcase(req.path_info, path):
+                if fnmatchcase(req.path_info, path) and \
+                        resource_from_path(self.env, req.path_info):
                     self.render_voter(req)
                     break
         return template, data, content_type
@@ -216,40 +313,100 @@ class VoteSystem(Component):
     ### IEnvironmentSetupParticipant methods
 
     def environment_created(self):
-        self.upgrade_environment(self.env.get_db_cnx())
+        pass
 
     def environment_needs_upgrade(self, db):
-        cursor = db.cursor()
-        # Care for pre-tracvote-0.1.4 installations. 
-        dburi = self.config.get('trac', 'database') 
-        tables = self._get_tables(dburi, cursor) 
-        if 'votes' in tables:
-            return False
-        return True
+        if self.get_schema_version(db) < self.schema_version:
+            return True
+        elif self.get_schema_version(db) > self.schema_version:
+            raise TracError(
+                "A newer version of VotePlugin has been installed before, "
+                "but downgrading is unsupported.")
+        return False
 
     def upgrade_environment(self, db):
-        db_backend, _ = DatabaseManager(self.env)._get_connector()
+        """Each schema version should have its own upgrade module, named
+        upgrades/dbN.py, where 'N' is the version number (int).
+        """
+        db_mgr = DatabaseManager(self.env)
+        schema_ver = self.get_schema_version(db)
+
         cursor = db.cursor()
-        for table in self.schema:
-            for stmt in db_backend.to_sql(table):
-                self.env.log.debug(stmt)
-                cursor.execute(stmt)
+        # Is this a new installation?
+        if not schema_ver:
+            # Perform a single-step install: Create plugin schema and
+            # insert default data into the database.
+            connector = db_mgr._get_connector()[0]
+            for table in self.schema:
+                for stmt in connector.to_sql(table):
+                    self.env.log.debug(stmt)
+                    cursor.execute(stmt)
+            for table, cols, vals in self.db_data:
+                cursor.executemany("INSERT INTO %s (%s) VALUES (%s)"
+                                   % (table, ','.join(cols),
+                                      ','.join(['%s' for c in cols])), vals)
+        elif schema_ver < self.schema_version:
+            # Perform incremental upgrades.
+            for i in range(schema_ver + 1, self.schema_version + 1):
+                name  = 'db%i' % i
+                try:
+                    upgrades = __import__('tracvote.upgrades', globals(),
+                                          locals(), [name])
+                    script = getattr(upgrades, name)
+                except AttributeError:
+                    raise TracError("No upgrade module for version "
+                                    "%(num)i (%(version)s.py)",
+                                    num=i, version=name)
+                script.do_upgrade(self.env, i, cursor)
+        else:
+            # Obsolete call handled gracefully.
+            return
+        cursor.execute("""
+            UPDATE system
+               SET value=%s
+             WHERE name='vote_version'
+            """, (self.schema_version,))
+        self.log.info("Upgraded VotePlugin db schema from version %d to %d"
+                      % (schema_ver, self.schema_version))
         db.commit()
 
     ### Internal methods
 
+    def get_schema_version(self, db=None):
+        """Return the current schema version for this plugin."""
+        db = db and db or self.env.get_db_cnx()
+        cursor = db.cursor()
+        cursor.execute("""
+            SELECT value
+              FROM system
+             WHERE name='vote_version'
+        """)
+        row = cursor.fetchone()
+        schema_ver = row and int(row[0]) or 0
+        if schema_ver > 1:
+            # The expected outcome for any recent installation.
+            return schema_ver
+        # Care for pre-tracvote-0.2 installations.
+        dburi = self.config.get('trac', 'database')
+        tables = self._get_tables(dburi, cursor)
+        if 'votes' in tables:
+            return 1
+        # This is a new installation.
+        return 0
+
     def render_voter(self, req):
-        resource = self.normalise_resource(req.path_info)
-        vote = self.get_vote(req, resource)
-        up = tag.img(src=req.href.chrome('vote/' + self.image_map[vote][0]), 
+        path = req.path_info.strip('/')
+        resource = resource_from_path(self.env, path)
+        vote = resource and self.get_vote(req, resource) or 0
+        up = tag.img(src=req.href.chrome('vote/' + self.image_map[vote][0]),
                      alt='Up-vote')
-        down = tag.img(src=req.href.chrome('vote/' + self.image_map[vote][1]), 
-                     alt='Down-vote')         
+        down = tag.img(src=req.href.chrome('vote/' + self.image_map[vote][1]),
+                     alt='Down-vote')
         if 'VOTE_MODIFY' in req.perm and get_reporter_id(req) != 'anonymous':
             down = tag.a(down, id='downvote',
-                         href=req.href.vote('down', resource),
+                         href=req.href.vote('down', path),
                          title='Down-vote')
-            up = tag.a(up, id='upvote', href=req.href.vote('up', resource),
+            up = tag.a(up, id='upvote', href=req.href.vote('up', path),
                        title='Up-vote')
             add_script(req, 'vote/js/tracvote.js')
             shown = req.session.get('shown_vote_message')
@@ -264,20 +421,12 @@ class VoteSystem(Component):
         elm = tag.span(up, votes, down, id='vote', title=title)
         req.chrome.setdefault('ctxtnav', []).insert(0, elm)
 
-    def normalise_resource(self, resource):
-        if isinstance(resource, basestring):
-            resource = resource.strip('/')
-            # Special-case: Default TracWiki start page.
-            if resource == 'wiki':
-                resource += '/WikiStart'
-            return resource
-        return get_resource_url(self.env, resource, Href('')).strip('/')
-
     def format_votes(self, resource):
         """Return a tuple of (body_text, title_text) describing the votes on a
         resource.
         """
-        negative, total, positive = self.get_vote_counts(resource)
+        negative, total, positive = resource and \
+                                    self.get_vote_counts(resource) or (0,0,0)
         count_detail = ['%+i' % i for i in (positive, negative) if i]
         if count_detail:
             count_detail = ' (%s)' % ', '.join(count_detail)
@@ -285,25 +434,25 @@ class VoteSystem(Component):
             count_detail = ''
         return ('%+i' % total, 'Vote count%s' % count_detail)
 
-    def _get_tables(self, dburi, cursor): 
-        """Code from TracMigratePlugin by Jun Omae (see tracmigrate.admin).""" 
-        if dburi.startswith('sqlite:'): 
-            sql = """ 
-                SELECT name 
-                  FROM sqlite_master 
-                 WHERE type='table' 
-                   AND NOT name='sqlite_sequence' 
-            """ 
-        elif dburi.startswith('postgres:'): 
-            sql = """ 
-                SELECT tablename 
-                  FROM pg_tables 
-                 WHERE schemaname = ANY (current_schemas(false)) 
-            """ 
-        elif dburi.startswith('mysql:'): 
-            sql = "SHOW TABLES" 
-        else: 
-            raise TracError('Unsupported database type "%s"' 
-                            % dburi.split(':')[0]) 
-        cursor.execute(sql) 
+    def _get_tables(self, dburi, cursor):
+        """Code from TracMigratePlugin by Jun Omae (see tracmigrate.admin)."""
+        if dburi.startswith('sqlite:'):
+            sql = """
+                SELECT name
+                  FROM sqlite_master
+                 WHERE type='table'
+                   AND NOT name='sqlite_sequence'
+            """
+        elif dburi.startswith('postgres:'):
+            sql = """
+                SELECT tablename
+                  FROM pg_tables
+                 WHERE schemaname = ANY (current_schemas(false))
+            """
+        elif dburi.startswith('mysql:'):
+            sql = "SHOW TABLES"
+        else:
+            raise TracError('Unsupported database type "%s"'
+                            % dburi.split(':')[0])
+        cursor.execute(sql)
         return sorted([row[0] for row in cursor])
