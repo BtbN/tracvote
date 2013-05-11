@@ -14,6 +14,8 @@
 import re
 from fnmatch import fnmatchcase
 
+from datetime import datetime
+
 from genshi import Markup, Stream
 from genshi.builder import tag
 from pkg_resources import resource_filename
@@ -26,6 +28,7 @@ from trac.perm import IPermissionRequestor
 from trac.resource import Resource, ResourceSystem, get_resource_description
 from trac.resource import get_resource_url
 from trac.util import get_reporter_id
+from trac.util.datefmt import format_datetime, to_datetime, utc
 from trac.util.text import to_unicode
 from trac.web.api import IRequestFilter, IRequestHandler, Href
 from trac.web.chrome import ITemplateProvider, add_ctxtnav, add_stylesheet
@@ -52,6 +55,15 @@ except ImportError:
         elif resource.id is None:
             return False
     resource_check = False
+
+# Provide `to_utimestamp`, that has been introduced in Trac 0.12.
+
+try:
+    from trac.util.datefmt import to_utimestamp
+except ImportError:
+    from trac.util.datefmt import to_timestamp
+    def to_utimestamp(dt):
+        return to_timestamp(dt) * 1000000
 
 
 def get_versioned_resource(env, resource):
@@ -212,26 +224,28 @@ class VoteSystem(Component):
                AND resource_id=%s
         """, (get_reporter_id(req), resource.realm, to_unicode(resource.id)))
         row = cursor.fetchone()
-        vote = row and row[0] or 0
-        return vote
+        return row and row[0]
 
     def set_vote(self, req, resource, vote):
         """Vote for a resource."""
+        now_ts = to_utimestamp(datetime.now(utc))
         db = self.env.get_db_cnx()
         cursor = db.cursor()
         cursor.execute("""
-            DELETE
-              FROM votes
+            UPDATE votes
+               SET changetime=%s, version=%s, vote=%s
              WHERE username=%s
                AND realm=%s
                AND resource_id=%s
-        """, (get_reporter_id(req), resource.realm, to_unicode(resource.id)))
-        if vote:
-            cursor.execute(
-                'INSERT INTO votes (realm,resource_id,version,username,vote) '
-                'VALUES (%s,%s,%s,%s,%s)',
-                (resource.realm, to_unicode(resource.id), resource.version,
-                 get_reporter_id(req), vote))
+        """, (now_ts, resource.version and resource.version or NULL, vote,
+              get_reporter_id(req), resource.realm, to_unicode(resource.id)))
+        if self.get_vote(req, resource) is None:
+            cursor.execute("""
+                INSERT INTO votes
+                    (realm,resource_id,version,username,vote,time,changetime)
+                VALUES (%s,%s,%s,%s,%s,%s,%s)
+            """, (resource.realm, to_unicode(resource.id), resource.version,
+                  get_reporter_id(req), vote, now_ts, now_ts))
         db.commit()
 
     def reparent_vote(self, resource, old_id):
@@ -432,7 +446,21 @@ class VoteSystem(Component):
             args, kw = parse_args(content)
 
         if name == 'LastVoted':
-            return
+            lst = tag.ul()
+            for i in self.get_votes(req):
+                resource = Resource(i[0], i[1])
+                # Anotate who and when.
+                voted = ('by %s at %s'
+                         % (i[3], format_datetime(to_datetime(i[4]))))
+                lst(tag.li(tag.a(get_resource_description(env, resource),
+                                 href=get_resource_url(env, resource,
+                                                       formatter.href),
+                                 title=('compact' in args and
+                                        '%+i %s' % (i[2], voted) or None)),
+                           (not 'compact' in args and
+                            Markup(' %s %s' % (tag.b('%+i' % i[2]),
+                                               voted)) or '')))
+            return lst
 
         elif name == 'TopVoted':
             realm = kw.get('realm')
@@ -445,12 +473,22 @@ class VoteSystem(Component):
                 lst(tag.li(tag.a(get_resource_description(env, resource),
                                  href=get_resource_url(env, resource,
                                                        formatter.href),
-                                 title='compact' in args and i[2] or None),
+                                 title=('compact' in args and
+                                        '%+i' % i[2] or None)),
                            (not 'compact' in args and ' (%+i)' % i[2] or '')))
             return lst
 
         elif name == 'VoteList':
-            return
+            lst = tag.ul()
+            resource = resource_from_path(env, req.path_info)
+            for i in self.get_votes(req, resource):
+                vote = ('at %s' % format_datetime(to_datetime(i[4])))
+                lst(tag.li('compact' in args and i[3] or
+                           Markup('%s by %s %s' % (tag.b('%+i' % i[2]),
+                                                   tag(i[3]), vote)),
+                           title=('compact' in args and
+                                  '%+i %s' % (i[2], vote) or None)))
+            return lst
 
     ### IEnvironmentSetupParticipant methods
 
