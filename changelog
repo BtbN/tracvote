@@ -1,0 +1,65 @@
+Author: Alec Thomas <alec@swapoff.org>
+Maintainer: Ryan J Ollos <ryan.j.ollos@gmail.com>
+Maintainer: Steffen Hoffmann <hoff.st@web.de>
+
+tracvote-0.2.0 (not yet released) - branch 0.11
+ resolved issues
+ * #7744: Add token to href to prevent CSRF
+ * #11037: Wrongly uses `re.match` for the `[vote] paths` setting
+ * include more author comments and explicit license file for clarity
+ * update and extend contributed sample SQL reports
+ * suppress undesired vote links on "action" pages like i.e. wiki page editor
+
+ new features
+ * #4546: Macro to show vote lists in wiki pages
+ * #7592: List voters or history
+ * #10942: Improvements for plugin's db schema
+   by adding db schema registration/versioning and common modular upgrade code
+ * add `IWikiChangeListener` functions to auto-update wiki resource entries
+
+
+tracvote-0.1.5 (23-Mar-2013) - branch 0.11
+ resolved issues
+ * #10706: New install will not be possible with Trac 1.0
+ * #10941: Change permission action definition for intuitive inheritance
+
+
+tracvote-0.1.4 (22-Mar-2013) - branch 0.11
+ resolved issues
+ * #3655: Sample report to sort tickets by the number of votes 
+ * #8597: Incorrect URL return when voting for ticket
+
+
+tracvote-0.1.3 (27-Aug-2010) - branch 0.11
+ resolved issues
+ * #3967: VotePlugin produces invalid XHTML strict
+ * #7556: Vote counter problem in Trac 0.12
+   by encoding unicode content with UTF8 for sending in compliance to Trac API
+ * fix 'get_max_votes' for the 'no votes' case
+
+
+maintenance take-over by Ryan J Ollos
+
+
+tracvote-0.1.2 (20-Oct-2009) - branch 0.11
+ resolved issues
+ * #3298: Bug when testing, if environment needs upgrade
+ * #3808: PostgreSQL database upgrade fail
+
+ new features
+ * add methods to get max votes, all votes and total vote count per realm
+
+
+tracvote-0.1.1 (29-Apr-2009) - branch 0.11
+ resolved issues
+ * #2843: VotePlugin doesn't include arrow images in package data
+ * #3812: Transparent background arrows
+ * change `add_warning` for initial greeter to appropriate, new `add_notice()`
+ * change 'shown_vote_message' value for non-SQLite db backend compatibility
+ * fix position of context navigation relative to active navigation items
+
+ new features
+ * include individual sums for negative and positive votes in the vote tooltip
+
+
+tracvote-0.1 (02-Jan-2008) - initial release, branch 0.11

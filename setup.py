@@ -18,7 +18,7 @@ setup(
     },
     author='Alec Thomas',
     maintainer = 'Ryan J Ollos',
-    maintainer_email = 'ryano@physiosonics.com',
+    maintainer_email = 'ryan.j.ollos@gmail.com',
 
     license='BSD',
 
