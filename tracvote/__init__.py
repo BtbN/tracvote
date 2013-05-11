@@ -28,11 +28,12 @@ from trac.perm import IPermissionRequestor
 from trac.resource import Resource, ResourceSystem, get_resource_description
 from trac.resource import get_resource_url
 from trac.util import get_reporter_id
+from trac.util.compat import partial
 from trac.util.datefmt import format_datetime, to_datetime, utc
 from trac.util.text import to_unicode
 from trac.web.api import IRequestFilter, IRequestHandler, Href
-from trac.web.chrome import ITemplateProvider, add_ctxtnav, add_stylesheet
-from trac.web.chrome import add_script, add_notice
+from trac.web.chrome import Chrome, ITemplateProvider, add_ctxtnav
+from trac.web.chrome import add_notice, add_script, add_stylesheet
 from trac.wiki.api import IWikiChangeListener, IWikiMacroProvider, parse_args
 
 
@@ -450,6 +451,7 @@ class VoteSystem(Component):
         req = formatter.req
         if not 'VOTE_VIEW' in req.perm:
             return
+        format_author = partial(Chrome(self.env).format_author, req)
         if not content:
             args = []
             kw = {}
@@ -462,7 +464,8 @@ class VoteSystem(Component):
                 resource = Resource(i[0], i[1])
                 # Anotate who and when.
                 voted = ('by %s at %s'
-                         % (i[3], format_datetime(to_datetime(i[4]))))
+                         % (format_author(i[3]),
+                            format_datetime(to_datetime(i[4]))))
                 lst(tag.li(tag.a(get_resource_description(env, resource),
                                  href=get_resource_url(env, resource,
                                                        formatter.href),
@@ -494,9 +497,10 @@ class VoteSystem(Component):
             resource = resource_from_path(env, req.path_info)
             for i in self.get_votes(req, resource):
                 vote = ('at %s' % format_datetime(to_datetime(i[4])))
-                lst(tag.li('compact' in args and i[3] or
-                           Markup('%s by %s %s' % (tag.b('%+i' % i[2]),
-                                                   tag(i[3]), vote)),
+                lst(tag.li('compact' in args and format_author(i[3]) or
+                           Markup(u'%s by %s %s'
+                                  % (tag.b('%+i' % i[2]),
+                                     tag(format_author(i[3])), vote)),
                            title=('compact' in args and
                                   '%+i %s' % (i[2], vote) or None)))
             return lst
