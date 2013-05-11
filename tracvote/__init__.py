@@ -294,7 +294,8 @@ class VoteSystem(Component):
                 content = content.encode('utf-8')
             req.send(content)
 
-        req.redirect(get_resource_url(self.env, resource, req.href))
+        req.redirect(get_resource_url(self.env, resource(version=None),
+                                      req.href))
 
     ### IRequestFilter methods
 
