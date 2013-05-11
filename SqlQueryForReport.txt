@@ -1,24 +1,43 @@
 -- ## Popular Voted Tickets ## --
 
--- The following is taken from the Edgewall
--- Trac site: http://trac.edgewall.org/report/34
+-- The following is originally taken from the Edgewall
+-- Trac site: http://trac.edgewall.org/report/34.
 -- See also: http://trac-hacks.org/ticket/3655
 
 -- Tickets ordered by number of votes (> 1)
 -- You must be [/prefs registered] to vote.
 
 SELECT p.value AS __color__,
-   t.type AS type, id AS ticket, sum(v.vote) as votes, summary, component, version,
-milestone,
-   time AS created,
-   changetime AS _changetime, description AS _description,
+   t.type AS type, id AS ticket, sum(v.vote) as votes, 
+   summary, component, t.version, milestone, t.time AS created,
+   t.changetime AS _changetime, description AS _description,
    reporter AS _reporter
   FROM ticket t, enum p, votes v
   WHERE status <> 'closed'
 AND p.name = t.priority AND p.type = 'priority'
-AND v.resource = 'ticket/' || id
-GROUP BY id, summary, component, version, milestone, t.type, owner,
-time,
-  changetime, description, reporter, p.value, status
+AND v.realm = 'ticket' AND v.resource_id = CAST(t.id as text)
+GROUP BY id, summary, component, t.version, milestone, t.type, owner,
+  t.time, t.changetime, description, reporter, p.value, status
 HAVING sum(v.vote) > 1
- ORDER BY votes DESC, milestone, t.type, time
+  ORDER BY votes DESC, milestone, t.type, t.time
+
+
+-- ## 40: Popular Wiki pages ## --
+
+-- Based on up/down votes
+-- The following is originally taken from the Edgewall
+-- Trac site: http://trac.edgewall.org/report/40.
+
+SELECT w.name AS id, sum(v.vote) as votes, 
+    (CASE WHEN sum(v.vote) > 10 THEN 1
+          WHEN sum(v.vote) > 5  THEN 2
+          WHEN sum(v.vote) < -5 THEN 5
+          WHEN sum(v.vote) < -1 THEN 4
+                                ELSE 3
+          END) as __color__,
+     'wiki' as _realm
+  FROM wiki w, votes v
+  WHERE w.version = 1 AND v.realm = 'wiki' AND v.resource_id = w.name
+GROUP BY w.name
+HAVING (sum(v.vote) > 1 OR sum(v.vote) < 1) AND NOT sum(v.vote) = 0
+ ORDER BY votes DESC, w.name ASC
