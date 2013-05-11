@@ -29,6 +29,8 @@ from trac.util.text import to_unicode
 from trac.web.api import IRequestFilter, IRequestHandler, Href
 from trac.web.chrome import ITemplateProvider, add_ctxtnav, add_stylesheet
 from trac.web.chrome import add_script, add_notice
+from trac.wiki.api import IWikiChangeListener
+
 
 # Provide `resource_exists`, that has been backported to Trac 0.11.8 only.
 try:
@@ -107,7 +109,8 @@ class VoteSystem(Component):
     """Allow up- and down-voting on Trac resources."""
 
     implements(ITemplateProvider, IRequestFilter, IRequestHandler,
-               IEnvironmentSetupParticipant, IPermissionRequestor)
+               IEnvironmentSetupParticipant, IPermissionRequestor,
+               IWikiChangeListener)
 
     image_map = {-1: ('aupgray.png', 'adownmod.png'),
                   0: ('aupgray.png', 'adowngray.png'),
@@ -210,6 +213,35 @@ class VoteSystem(Component):
                  get_reporter_id(req), vote))
         db.commit()
 
+    def reparent_vote(self, resource, old_id):
+        """Update resource reference of votes on a renamed resource."""
+        db = self.env.get_db_cnx()
+        cursor = db.cursor()
+        cursor.execute("""
+            UPDATE votes
+               SET resource_id=%s
+             WHERE realm=%s
+               AND resource_id=%s
+        """, (to_unicode(resource.id), resource.realm, to_unicode(old_id)))
+        db.commit()
+
+    def delete_vote(self, resource):
+        """Delete vote for a resource."""
+        args = list((get_reporter_id(req), resource.realm,
+                     to_unicode(resource.id)))
+        if resource.version:
+            args.append(resource.version)
+        db = self.env.get_db_cnx()
+        cursor = db.cursor()
+        cursor.execute("""
+            DELETE
+              FROM votes
+             WHERE username=%%s
+               AND realm=%%s
+               AND resource_id=%%s%s
+        """ % (resource.version and ' AND version=%s' or ''), args)
+        db.commit()
+
     def get_total_vote_count(self, realm):
         """Return the total vote count for a realm, like 'ticket'."""
         db = self.env.get_db_cnx()
@@ -310,6 +342,33 @@ class VoteSystem(Component):
                     self.render_voter(req)
                     break
         return template, data, content_type
+
+    ### IWikiChangeListener methods
+
+    def wiki_page_added(self, page):
+        """Called whenever a new Wiki page is added."""
+        pass
+
+    def wiki_page_changed(self, page, version, t, comment, author, ipnr):
+        """Called when a page has been modified."""
+        pass
+
+    def wiki_page_deleted(self, page):
+        """Called when a page has been deleted."""
+        page.resource.version = None
+        self.delete_vote(page.resource)
+
+    def wiki_page_version_deleted(self, page):
+        """Called when a version of a page has been deleted."""
+        self.delete_vote(page.resource)
+
+    def wiki_page_renamed(self, page, old_name): 
+        """Called when a page has been renamed."""
+        # Correct references for all page versions.
+        page.resource.version = None
+        # Work around issue t:#11138.
+        page.resource.id = page.name
+        self.reparent_vote(page.resource, old_name)
 
     ### IEnvironmentSetupParticipant methods
 
