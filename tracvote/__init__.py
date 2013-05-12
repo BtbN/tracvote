@@ -57,7 +57,25 @@ except ImportError:
             return False
     resource_check = False
 
-# Provide `to_utimestamp`, that has been introduced in Trac 0.12.
+# Provide functions, that have been introduced in Trac 0.12.
+
+try:
+    from trac.util import as_int
+except ImportError:
+    def as_int(s, default, min=None, max=None):
+        """Convert s to an int and limit it to the given range, or
+        return default if unsuccessful (copied verbatim from Trac 1.0).
+        """
+        try:
+            value = int(s)
+        except (TypeError, ValueError):
+            return default
+        if min is not None and value < min:
+            value = min
+        if max is not None and value > max:
+            value = max
+        return value
+
 try:
     from trac.util.datefmt import to_utimestamp
 except ImportError:
@@ -175,7 +193,7 @@ class VoteSystem(Component):
 
     ### Public methods
 
-    def get_top_voted(self, req, realm=None, top=10):
+    def get_top_voted(self, req, realm=None, top=0):
         """Return resources ordered top-down by vote count."""
         args = []
         if realm:
@@ -292,17 +310,20 @@ class VoteSystem(Component):
         """ % (resource.version and ' AND version=%s' or ''), args)
         db.commit()
 
-    def get_votes(self, req, resource=None):
+    def get_votes(self, req, resource=None, top=0):
         """Return most recent votes, optionally only for one resource."""
-        args = resource and (resource.realm, to_unicode(resource.id)) or []
+        args = resource and [resource.realm, to_unicode(resource.id)] or []
+        if top:
+            args.append(top)
         db = self.env.get_db_cnx()
         cursor = db.cursor()
         cursor.execute("""
             SELECT realm,resource_id,vote,username,changetime
               FROM votes
              WHERE changetime is not NULL%s
-             ORDER BY changetime DESC
-        """ % (resource and ' AND realm=%s AND resource_id=%s' or ''), args)
+             ORDER BY changetime DESC%s
+        """ % (resource and ' AND realm=%s AND resource_id=%s' or '',
+               top and ' LIMIT %s' or ''), args)
         rows = cursor.fetchall()
         for row in rows:
             yield row
@@ -481,58 +502,60 @@ class VoteSystem(Component):
         req = formatter.req
         if not 'VOTE_VIEW' in req.perm:
             return
+        # Simplify function calls.
         format_author = partial(Chrome(self.env).format_author, req)
         if not content:
             args = []
+            compact = None
             kw = {}
+            top = 5
         else:
             args, kw = parse_args(content)
+            compact = 'compact' in args and True
+            top = as_int(kw.get('top'), 5, min=0)
 
         if name == 'LastVoted':
             lst = tag.ul()
-            for i in self.get_votes(req):
+            for i in self.get_votes(req, top=top):
                 resource = Resource(i[0], i[1])
                 # Anotate who and when.
                 voted = ('by %s at %s'
                          % (format_author(i[3]),
                             format_datetime(to_datetime(i[4]))))
-                lst(tag.li(tag.a(get_resource_description(env, resource),
-                                 href=get_resource_url(env, resource,
-                                                       formatter.href),
-                                 title=('compact' in args and
-                                        '%+i %s' % (i[2], voted) or None)),
-                           (not 'compact' in args and
-                            Markup(' %s %s' % (tag.b('%+i' % i[2]),
-                                               voted)) or '')))
+                lst(tag.li(tag.a(
+                    get_resource_description(env, resource, compact and
+                                             'compact' or 'default'),
+                    href=get_resource_url(env, resource, formatter.href),
+                    title=(compact and '%+i %s' % (i[2], voted) or None)),
+                    (not compact and Markup(' %s %s' % (tag.b('%+i' % i[2]),
+                                                        voted)) or '')))
             return lst
 
         elif name == 'TopVoted':
             realm = kw.get('realm')
-            top = kw.get('top')
             lst = tag.ul()
             for i in self.get_top_voted(req, realm=realm, top=top):
                 if 'up-only' in args and i[2] < 1:
                     break
                 resource = Resource(i[0], i[1])
-                lst(tag.li(tag.a(get_resource_description(env, resource),
-                                 href=get_resource_url(env, resource,
-                                                       formatter.href),
-                                 title=('compact' in args and
-                                        '%+i' % i[2] or None)),
-                           (not 'compact' in args and ' (%+i)' % i[2] or '')))
+                lst(tag.li(tag.a(
+                    get_resource_description(env, resource, compact and
+                                             'compact' or 'default'),
+                    href=get_resource_url(env, resource, formatter.href),
+                    title=(compact and '%+i' % i[2] or None)),
+                    (not compact and ' (%+i)' % i[2] or '')))
             return lst
 
         elif name == 'VoteList':
             lst = tag.ul()
             resource = resource_from_path(env, req.path_info)
-            for i in self.get_votes(req, resource):
+            for i in self.get_votes(req, resource, top=top):
                 vote = ('at %s' % format_datetime(to_datetime(i[4])))
-                lst(tag.li('compact' in args and format_author(i[3]) or
-                           Markup(u'%s by %s %s'
-                                  % (tag.b('%+i' % i[2]),
-                                     tag(format_author(i[3])), vote)),
-                           title=('compact' in args and
-                                  '%+i %s' % (i[2], vote) or None)))
+                lst(tag.li(
+                    compact and format_author(i[3]) or
+                    Markup(u'%s by %s %s' % (tag.b('%+i' % i[2]),
+                                             tag(format_author(i[3])), vote)),
+                    title=(compact and '%+i %s' % (i[2], vote) or None)))
             return lst
 
     ### IEnvironmentSetupParticipant methods
