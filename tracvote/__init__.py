@@ -58,13 +58,20 @@ except ImportError:
     resource_check = False
 
 # Provide `to_utimestamp`, that has been introduced in Trac 0.12.
-
 try:
     from trac.util.datefmt import to_utimestamp
 except ImportError:
     from trac.util.datefmt import to_timestamp
     def to_utimestamp(dt):
         return to_timestamp(dt) * 1000000
+
+# That interface has been introduced in Trac 0.12 too.
+has_milestonechangelistener = False
+try:
+    from trac.ticket.api import IMilestoneChangeListener
+    has_milestonechangelistener = True
+except ImportError:
+    has_milestonechangelistener = False
 
 
 def get_versioned_resource(env, resource):
@@ -111,7 +118,7 @@ def resource_from_path(env, path):
             path += '/WikiStart'
     for realm in ResourceSystem(env).get_known_realms():
         if path.startswith(realm):
-            resource_id = re.sub(realm, '', path).lstrip('/')
+            resource_id = re.sub(realm, '', path, 1).lstrip('/')
             resource = Resource(realm, resource_id)
             if not resource_check:
                 return resource
@@ -122,9 +129,15 @@ def resource_from_path(env, path):
 class VoteSystem(Component):
     """Allow up- and down-voting on Trac resources."""
 
-    implements(ITemplateProvider, IRequestFilter, IRequestHandler,
-               IEnvironmentSetupParticipant, IPermissionRequestor,
-               IWikiChangeListener, IWikiMacroProvider)
+    implements(IEnvironmentSetupParticipant,
+               IPermissionRequestor,
+               IRequestFilter,
+               IRequestHandler,
+               ITemplateProvider,
+               IWikiChangeListener,
+               IWikiMacroProvider)
+    if has_milestonechangelistener:
+        implements(IMilestoneChangeListener)
 
     image_map = {-1: ('aupgray.png', 'adownmod.png'),
                   0: ('aupgray.png', 'adowngray.png'),
@@ -157,7 +170,7 @@ class VoteSystem(Component):
             ('name', 'value'),
                 (('vote_version', str(schema_version)),)))
 
-    voteable_paths = ListOption('vote', 'paths', '/wiki*,/ticket*',
+    voteable_paths = ListOption('vote', 'paths', '/ticket*,/wiki*',
         doc='List of URL paths to allow voting on. Globs are supported.')
 
     ### Public methods
@@ -230,16 +243,19 @@ class VoteSystem(Component):
     def set_vote(self, req, resource, vote):
         """Vote for a resource."""
         now_ts = to_utimestamp(datetime.now(utc))
+        args = list((now_ts, resource.version, vote, get_reporter_id(req),
+                     resource.realm, to_unicode(resource.id)))
+        if not resource.version:
+            args.pop(1)
         db = self.env.get_db_cnx()
         cursor = db.cursor()
         cursor.execute("""
             UPDATE votes
-               SET changetime=%s, version=%s, vote=%s
-             WHERE username=%s
-               AND realm=%s
-               AND resource_id=%s
-        """, (now_ts, resource.version and resource.version or NULL, vote,
-              get_reporter_id(req), resource.realm, to_unicode(resource.id)))
+               SET changetime=%%s%s,vote=%%s
+             WHERE username=%%s
+               AND realm=%%s
+               AND resource_id=%%s
+        """ % (resource.version and ',version=%s' or ''), args)
         if self.get_vote(req, resource) is None:
             cursor.execute("""
                 INSERT INTO votes
@@ -249,7 +265,7 @@ class VoteSystem(Component):
                   get_reporter_id(req), vote, now_ts, now_ts))
         db.commit()
 
-    def reparent_vote(self, resource, old_id):
+    def reparent_votes(self, resource, old_id):
         """Update resource reference of votes on a renamed resource."""
         db = self.env.get_db_cnx()
         cursor = db.cursor()
@@ -261,10 +277,9 @@ class VoteSystem(Component):
         """, (to_unicode(resource.id), resource.realm, to_unicode(old_id)))
         db.commit()
 
-    def delete_vote(self, resource):
-        """Delete vote for a resource."""
-        args = list((get_reporter_id(req), resource.realm,
-                     to_unicode(resource.id)))
+    def delete_votes(self, resource):
+        """Delete votes for a resource."""
+        args = list((resource.realm, to_unicode(resource.id)))
         if resource.version:
             args.append(resource.version)
         db = self.env.get_db_cnx()
@@ -272,8 +287,7 @@ class VoteSystem(Component):
         cursor.execute("""
             DELETE
               FROM votes
-             WHERE username=%%s
-               AND realm=%%s
+             WHERE realm=%%s
                AND resource_id=%%s%s
         """ % (resource.version and ' AND version=%s' or ''), args)
         db.commit()
@@ -334,19 +348,26 @@ class VoteSystem(Component):
             return 0
         return max([i[1] for i in votes.values()])
 
+    ### IMilestoneChangeListener methods
+
+    def milestone_created(self, milestone):
+        """Called when a milestone is created."""
+        pass
+
+    def milestone_changed(self, milestone, old_values):
+        """Called when a milestone is modified."""
+        old_name = old_values.get('name')
+        if old_name and milestone.resource.id != old_name:
+            self.reparent_votes(milestone.resource, old_name)
+
+    def milestone_deleted(self, milestone):
+        """Called when a milestone is deleted."""
+        self.delete_votes(milestone.resource)
+
     ### IPermissionRequestor method
     def get_permission_actions(self):
         action = 'VOTE_VIEW'
         return [('VOTE_MODIFY', [action]), action]
-
-    ### ITemplateProvider methods
-
-    def get_templates_dirs(self):
-        return []
-        #resource_filename(__name__, 'templates')]
-
-    def get_htdocs_dirs(self):
-        return [('vote', resource_filename(__name__, 'htdocs'))]
 
     ### IRequestHandler methods
 
@@ -405,6 +426,15 @@ class VoteSystem(Component):
                     break
         return template, data, content_type
 
+    ### ITemplateProvider methods
+
+    def get_templates_dirs(self):
+        return []
+        #resource_filename(__name__, 'templates')]
+
+    def get_htdocs_dirs(self):
+        return [('vote', resource_filename(__name__, 'htdocs'))]
+
     ### IWikiChangeListener methods
 
     def wiki_page_added(self, page):
@@ -418,11 +448,11 @@ class VoteSystem(Component):
     def wiki_page_deleted(self, page):
         """Called when a page has been deleted."""
         page.resource.version = None
-        self.delete_vote(page.resource)
+        self.delete_votes(page.resource)
 
     def wiki_page_version_deleted(self, page):
         """Called when a version of a page has been deleted."""
-        self.delete_vote(page.resource)
+        self.delete_votes(page.resource)
 
     def wiki_page_renamed(self, page, old_name): 
         """Called when a page has been renamed."""
@@ -430,7 +460,7 @@ class VoteSystem(Component):
         page.resource.version = None
         # Work around issue t:#11138.
         page.resource.id = page.name
-        self.reparent_vote(page.resource, old_name)
+        self.reparent_votes(page.resource, old_name)
 
     ### IWikiMacroProvider methods
     def get_macros(self):
