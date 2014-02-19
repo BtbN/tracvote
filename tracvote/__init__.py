@@ -475,7 +475,7 @@ class VoteSystem(Component):
         """Called when a version of a page has been deleted."""
         self.delete_votes(page.resource)
 
-    def wiki_page_renamed(self, page, old_name): 
+    def wiki_page_renamed(self, page, old_name):
         """Called when a page has been renamed."""
         # Correct references for all page versions.
         page.resource.version = None
