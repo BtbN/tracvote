@@ -31,11 +31,13 @@ from trac.util import get_reporter_id
 from trac.util.compat import partial
 from trac.util.datefmt import format_datetime, to_datetime, utc
 from trac.util.text import to_unicode
+from trac.util.translation import domain_functions
 from trac.web.api import IRequestFilter, IRequestHandler, Href
 from trac.web.chrome import Chrome, ITemplateProvider, add_ctxtnav
 from trac.web.chrome import add_notice, add_script, add_stylesheet
 from trac.wiki.api import IWikiChangeListener, IWikiMacroProvider, parse_args
 
+_, add_domain, tag_ = domain_functions('tracvote', ('_', 'add_domain', 'tag_'))
 
 # Provide `resource_exists`, that has been backported to Trac 0.11.8 only.
 try:
@@ -147,6 +149,11 @@ def resource_from_path(env, path):
 class VoteSystem(Component):
     """Allow up- and down-voting on Trac resources."""
 
+    def __init__(self):
+        """Set up translation domain"""
+        locale_dir = resource_filename(__name__, 'locale')
+        add_domain(self.env.path, locale_dir)
+
     implements(IEnvironmentSetupParticipant,
                IPermissionRequestor,
                IRequestFilter,
@@ -189,7 +196,8 @@ class VoteSystem(Component):
                 (('vote_version', str(schema_version)),)))
 
     voteable_paths = ListOption('vote', 'paths', '/ticket*,/wiki*',
-        doc='List of URL paths to allow voting on. Globs are supported.')
+        doc="""List of URL paths to allow voting on. Globs are supported.
+            """, doc_domain='tracvote')
 
     ### Public methods
 
@@ -409,10 +417,10 @@ class VoteSystem(Component):
         msg = ''
         if req.args.get('token') != req.form_token:
             if self.env.secure_cookies and req.scheme == 'http':
-                msg = ("Secure cookies are enabled, you must use https for "
-                       "your requests.")
+                msg = _("Secure cookies are enabled, you must use https "
+                        "for your requests.")
             else:
-                msg = ("Do you have cookies enabled?")
+                msg = _("Do you have cookies enabled?")
             raise TracError(msg)
         else:
             if old_vote == vote:
@@ -491,11 +499,11 @@ class VoteSystem(Component):
 
     def get_macro_description(self, name):
         if name == 'LastVoted':
-            return "Show most recently voted resources."
+            return _("Show most recently voted resources.")
         elif name == 'TopVoted':
-            return "Show listing of voted resources ordered by total score."
+            return _("Show listing of voted resources ordered by total score.")
         elif name == 'VoteList':
-            return "Show listing of most recent votes for a resource."
+            return _("Show listing of most recent votes for a resource.")
 
     def expand_macro(self, formatter, name, content):
         env = formatter.env
@@ -519,9 +527,9 @@ class VoteSystem(Component):
             for i in self.get_votes(req, top=top):
                 resource = Resource(i[0], i[1])
                 # Anotate who and when.
-                voted = ('by %s at %s'
-                         % (format_author(i[3]),
-                            format_datetime(to_datetime(i[4]))))
+                voted = _("by %(author)s at %(time)s",
+                          author=format_author(i[3]),
+                          time=format_datetime(to_datetime(i[4])))
                 lst(tag.li(tag.a(
                     get_resource_description(env, resource, compact and
                                              'compact' or 'default'),
@@ -550,12 +558,15 @@ class VoteSystem(Component):
             lst = tag.ul()
             resource = resource_from_path(env, req.path_info)
             for i in self.get_votes(req, resource, top=top):
-                vote = ('at %s' % format_datetime(to_datetime(i[4])))
+                vote = _("at %(date)s",
+                         date=format_datetime(to_datetime(i[4])))
                 lst(tag.li(
                     compact and format_author(i[3]) or
-                    Markup(u'%s by %s %s' % (tag.b('%+i' % i[2]),
-                                             tag(format_author(i[3])), vote)),
-                    title=(compact and '%+i %s' % (i[2], vote) or None)))
+                    tag_("%(count)s by %(author)s %(vote)s",
+                         count=tag.b('%+i' % i[2]),
+                         author=tag(format_author(i[3])),
+                         vote=vote)),
+                    title=(compact and '%+i %s' % (i[2], vote) or None))
             return lst
 
     ### IEnvironmentSetupParticipant methods
@@ -568,8 +579,8 @@ class VoteSystem(Component):
             return True
         elif self.get_schema_version(db) > self.schema_version:
             raise TracError(
-                "A newer version of VotePlugin has been installed before, "
-                "but downgrading is unsupported.")
+                _("A newer version of VotePlugin has been installed before, "
+                  "but downgrading is unsupported."))
         return False
 
     def upgrade_environment(self, db):
@@ -602,9 +613,9 @@ class VoteSystem(Component):
                                           locals(), [name])
                     script = getattr(upgrades, name)
                 except AttributeError:
-                    raise TracError("No upgrade module for version "
-                                    "%(num)i (%(version)s.py)",
-                                    num=i, version=name)
+                    raise TracError(_("No upgrade module for version "
+                                      "%(num)i (%(version)s.py)",
+                                      num=i, version=name))
                 script.do_upgrade(self.env, i, cursor)
         else:
             # Obsolete call handled gracefully.
@@ -647,24 +658,24 @@ class VoteSystem(Component):
         resource = resource_from_path(self.env, path)
         vote = resource and self.get_vote(req, resource) or 0
         up = tag.img(src=req.href.chrome('vote/' + self.image_map[vote][0]),
-                     alt='Up-vote')
+                     alt=_("Up-vote"))
         down = tag.img(src=req.href.chrome('vote/' + self.image_map[vote][1]),
-                       alt='Down-vote')
+                       alt=_("Down-vote"))
         if not 'action' in req.args and 'VOTE_MODIFY' in req.perm and \
                 get_reporter_id(req) != 'anonymous':
             down = tag.a(down, id='downvote',
                          href=req.href.vote('down', path,
                                             token=req.form_token),
-                         title='Down-vote')
+                         title=_("Down-vote"))
             up = tag.a(up, id='upvote',
                        href=req.href.vote('up', path, token=req.form_token),
-                       title='Up-vote')
+                       title=_("Up-vote"))
             add_script(req, 'vote/js/tracvote.js')
             shown = req.session.get('shown_vote_message')
             if not shown:
-                add_notice(req, 'You can vote for resources on this Trac '
-                           'install by clicking the up-vote/down-vote arrows '
-                           'in the context navigation bar.')
+                add_notice(req, _("You can vote for resources on this Trac "
+                                  "install by clicking the up-vote/down-vote "
+                                  "arrows in the context navigation bar."))
                 req.session['shown_vote_message'] = '1'
         body, title = self.format_votes(resource)
         votes = tag.span(body, id='votes')
@@ -683,7 +694,7 @@ class VoteSystem(Component):
             count_detail = ' (%s)' % ', '.join(count_detail)
         else:
             count_detail = ''
-        return ('%+i' % total, 'Vote count%s' % count_detail)
+        return '%+i' % total, _("Vote count%s") % count_detail
 
     def _get_tables(self, dburi, cursor):
         """Code from TracMigratePlugin by Jun Omae (see tracmigrate.admin)."""
@@ -703,7 +714,7 @@ class VoteSystem(Component):
         elif dburi.startswith('mysql:'):
             sql = "SHOW TABLES"
         else:
-            raise TracError('Unsupported database type "%s"'
+            raise TracError(_('Unsupported database type "%s"')
                             % dburi.split(':')[0])
         cursor.execute(sql)
         return sorted([row[0] for row in cursor])

@@ -1,0 +1,96 @@
+# Translations template for TracVote.
+# Copyright (C) 2014 ORGANIZATION
+# This file is distributed under the same license as the TracVote
+# project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2014.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: TracVote 0.2\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2014-11-14 23:55-0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 0.9.6\n"
+
+#: tracvote/__init__.py:198
+msgid ""
+"List of URL paths to allow voting on. Globs are supported.\n"
+"            "
+msgstr ""
+
+#: tracvote/__init__.py:420
+msgid "Secure cookies are enabled, you must use https for your requests."
+msgstr ""
+
+#: tracvote/__init__.py:423
+msgid "Do you have cookies enabled?"
+msgstr ""
+
+#: tracvote/__init__.py:502
+msgid "Show most recently voted resources."
+msgstr ""
+
+#: tracvote/__init__.py:504
+msgid "Show listing of voted resources ordered by total score."
+msgstr ""
+
+#: tracvote/__init__.py:506
+msgid "Show listing of most recent votes for a resource."
+msgstr ""
+
+#: tracvote/__init__.py:532
+#, python-format
+msgid "by %(author)s at %(time)s"
+msgstr ""
+
+#: tracvote/__init__.py:561
+#, python-format
+msgid "at %s"
+msgstr ""
+
+#: tracvote/__init__.py:565
+#, python-format
+msgid "%s by %s %s"
+msgstr ""
+
+#: tracvote/__init__.py:579
+msgid ""
+"A newer version of VotePlugin has been installed before, but "
+"downgrading is unsupported."
+msgstr ""
+
+#: tracvote/__init__.py:613
+#, python-format
+msgid "No upgrade module for version %(num)i (%(version)s.py)"
+msgstr ""
+
+#: tracvote/__init__.py:658 tracvote/__init__.py:669
+msgid "Up-vote"
+msgstr ""
+
+#: tracvote/__init__.py:660 tracvote/__init__.py:666
+msgid "Down-vote"
+msgstr ""
+
+#: tracvote/__init__.py:673
+msgid ""
+"You can vote for resources on this Trac install by clicking the up-"
+"vote/down-vote arrows in the context navigation bar."
+msgstr ""
+
+#: tracvote/__init__.py:694
+#, python-format
+msgid "Vote count%s"
+msgstr ""
+
+#: tracvote/__init__.py:714
+#, python-format
+msgid "Unsupported database type \"%s\""
+msgstr ""
+
