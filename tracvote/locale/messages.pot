@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: TracVote 0.2\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2014-11-14 23:55-0800\n"
+"POT-Creation-Date: 2014-11-15 00:03-0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -49,47 +49,47 @@ msgstr ""
 msgid "by %(author)s at %(time)s"
 msgstr ""
 
-#: tracvote/__init__.py:561
+#: tracvote/__init__.py:562
 #, python-format
-msgid "at %s"
+msgid "at %(date)s"
 msgstr ""
 
-#: tracvote/__init__.py:565
+#: tracvote/__init__.py:567
 #, python-format
-msgid "%s by %s %s"
+msgid "%(count)s by %(author)s %(vote)s"
 msgstr ""
 
-#: tracvote/__init__.py:579
+#: tracvote/__init__.py:582
 msgid ""
 "A newer version of VotePlugin has been installed before, but "
 "downgrading is unsupported."
 msgstr ""
 
-#: tracvote/__init__.py:613
+#: tracvote/__init__.py:616
 #, python-format
 msgid "No upgrade module for version %(num)i (%(version)s.py)"
 msgstr ""
 
-#: tracvote/__init__.py:658 tracvote/__init__.py:669
+#: tracvote/__init__.py:661 tracvote/__init__.py:672
 msgid "Up-vote"
 msgstr ""
 
-#: tracvote/__init__.py:660 tracvote/__init__.py:666
+#: tracvote/__init__.py:663 tracvote/__init__.py:669
 msgid "Down-vote"
 msgstr ""
 
-#: tracvote/__init__.py:673
+#: tracvote/__init__.py:676
 msgid ""
 "You can vote for resources on this Trac install by clicking the up-"
 "vote/down-vote arrows in the context navigation bar."
 msgstr ""
 
-#: tracvote/__init__.py:694
+#: tracvote/__init__.py:697
 #, python-format
 msgid "Vote count%s"
 msgstr ""
 
-#: tracvote/__init__.py:714
+#: tracvote/__init__.py:717
 #, python-format
 msgid "Unsupported database type \"%s\""
 msgstr ""
