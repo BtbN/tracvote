@@ -16,7 +16,7 @@ from fnmatch import fnmatchcase
 
 from datetime import datetime
 
-from genshi import Markup, Stream
+from genshi import Markup
 from genshi.builder import tag
 from pkg_resources import resource_filename
 
@@ -32,8 +32,8 @@ from trac.util.compat import partial
 from trac.util.datefmt import format_datetime, to_datetime, utc
 from trac.util.text import to_unicode
 from trac.util.translation import domain_functions
-from trac.web.api import IRequestFilter, IRequestHandler, Href
-from trac.web.chrome import Chrome, ITemplateProvider, add_ctxtnav
+from trac.web.api import IRequestFilter, IRequestHandler
+from trac.web.chrome import Chrome, ITemplateProvider
 from trac.web.chrome import add_notice, add_script, add_stylesheet
 from trac.wiki.api import IWikiChangeListener, IWikiMacroProvider, parse_args
 
@@ -101,30 +101,26 @@ def get_versioned_resource(env, resource):
     the current version has to be retrieved separately.
     """
     realm = resource.realm
+    resource.version = 0
     if realm == 'ticket':
-        db = env.get_db_cnx()
-        cursor = db.cursor()
-        cursor.execute("""
-            SELECT SUM(c.change) FROM (
-                SELECT 1 as change
-                  FROM ticket_change
-                 WHERE ticket=%s
-                 GROUP BY time) AS c
-            """, (resource.id,))
-        tkt_changes = cursor.fetchone()
-        resource.version = tkt_changes and tkt_changes[0] or 0
+        for tkt_changes, in env.db_query("""
+                SELECT SUM(c.change) FROM (
+                    SELECT 1 as change
+                      FROM ticket_change
+                     WHERE ticket=%s
+                     GROUP BY time) AS c
+                """, (resource.id,)):
+            resource.version = tkt_changes
     elif realm == 'wiki':
-        db = env.get_db_cnx()
-        cursor = db.cursor()
-        cursor.execute("""
-            SELECT version
-              FROM wiki
-             WHERE name=%s
-             ORDER BY version DESC LIMIT 1
-            """, (resource.id,))
-        page_version = cursor.fetchone()
-        resource.version = page_version and int(page_version[0]) or 0
+        for version, in env.db_query("""
+                SELECT version
+                  FROM wiki
+                 WHERE name=%s
+                 ORDER BY version DESC LIMIT 1
+                """, (resource.id,)):
+            resource.version = version
     return resource
+
 
 def resource_from_path(env, path):
     """Find realm and resource ID from resource URL.
@@ -208,164 +204,150 @@ class VoteSystem(Component):
             args.append(realm)
         if top:
             args.append(top)
-        db = self.env.get_db_cnx()
-        cursor = db.cursor()
-        cursor.execute("""
-            SELECT realm,resource_id,SUM(vote) AS count
-              FROM votes%s
-             GROUP by realm,resource_id
-             ORDER by count DESC,resource_id%s
-        """ % (realm and ' WHERE realm=%s' or '', top and ' LIMIT %s' or ''),
-            args)
-        rows = cursor.fetchall()
-        for row in rows:
+        for row in self.env.db_query("""
+                SELECT realm,resource_id,SUM(vote) AS count
+                  FROM votes%s
+                 GROUP by realm,resource_id
+                 ORDER by count DESC,resource_id%s
+                """ % (' WHERE realm=%s' if realm else '',
+                       ' LIMIT %s' if top else ''), args):
             yield row
 
     def get_vote_counts(self, resource):
         """Get negative, total and positive vote counts and return them in a
         tuple.
         """
-        db = self.env.get_db_cnx()
-        cursor = db.cursor()
-        cursor.execute("""
-            SELECT sum(vote)
-              FROM votes
-             WHERE realm=%s
-               AND resource_id=%s
-        """, (resource.realm, resource.id))
-        total = cursor.fetchone()[0] or 0
-        cursor.execute("""
-            SELECT sum(vote)
-              FROM votes
-             WHERE vote < 0
-               AND realm=%s
-               AND resource_id=%s
-        """, (resource.realm, resource.id))
-        negative = cursor.fetchone()[0] or 0
-        cursor.execute("""
-            SELECT sum(vote)
-              FROM votes
-             WHERE vote > 0
-               AND realm=%s
-               AND resource_id=%s
-        """, (resource.realm, to_unicode(resource.id)))
-        positive = cursor.fetchone()[0] or 0
-        return (negative, total, positive)
+        with self.env.db_query as db:
+            total = negative = positive = 0
+            for sum_vote, in db("""
+                    SELECT sum(vote)
+                      FROM votes
+                     WHERE realm=%s
+                       AND resource_id=%s
+                    """, (resource.realm, resource.id)):
+                total = sum_vote
+            for sum_vote, in db("""
+                    SELECT sum(vote)
+                      FROM votes
+                     WHERE vote < 0
+                       AND realm=%s
+                       AND resource_id=%s
+                    """, (resource.realm, resource.id)):
+                negative = sum_vote
+            for sum_vote, in db("""
+                    SELECT sum(vote)
+                      FROM votes
+                     WHERE vote > 0
+                       AND realm=%s
+                       AND resource_id=%s
+                    """, (resource.realm, to_unicode(resource.id))):
+                positive = sum_vote
+            return negative or 0, total or 0, positive or 0
 
     def get_vote(self, req, resource):
         """Return the current users vote for a resource."""
-        db = self.env.get_db_cnx()
-        cursor = db.cursor()
-        cursor.execute("""
-            SELECT vote
-              FROM votes
-             WHERE username=%s
-               AND realm=%s
-               AND resource_id=%s
-        """, (get_reporter_id(req), resource.realm, to_unicode(resource.id)))
-        row = cursor.fetchone()
-        return row and row[0]
+        for vote, in self.env.db_query("""
+                SELECT vote
+                  FROM votes
+                 WHERE username=%s
+                   AND realm=%s
+                   AND resource_id=%s
+                """, (get_reporter_id(req), resource.realm,
+                      to_unicode(resource.id))):
+            return vote
 
     def set_vote(self, req, resource, vote):
         """Vote for a resource."""
         now_ts = to_utimestamp(datetime.now(utc))
-        args = list((now_ts, resource.version, vote, get_reporter_id(req),
-                     resource.realm, to_unicode(resource.id)))
+        args = [now_ts, resource.version, vote, get_reporter_id(req),
+                resource.realm, to_unicode(resource.id)]
         if not resource.version:
             args.pop(1)
-        db = self.env.get_db_cnx()
-        cursor = db.cursor()
-        cursor.execute("""
-            UPDATE votes
-               SET changetime=%%s%s,vote=%%s
-             WHERE username=%%s
-               AND realm=%%s
-               AND resource_id=%%s
-        """ % (resource.version and ',version=%s' or ''), args)
-        if self.get_vote(req, resource) is None:
-            cursor.execute("""
-                INSERT INTO votes
-                    (realm,resource_id,version,username,vote,time,changetime)
-                VALUES (%s,%s,%s,%s,%s,%s,%s)
-            """, (resource.realm, to_unicode(resource.id), resource.version,
-                  get_reporter_id(req), vote, now_ts, now_ts))
-        db.commit()
+        with self.env.db_transaction as db:
+            db("""
+                UPDATE votes
+                   SET changetime=%%s%s,vote=%%s
+                 WHERE username=%%s
+                   AND realm=%%s
+                   AND resource_id=%%s
+            """ % (',version=%s' if resource.version else ''), args)
+            if self.get_vote(req, resource) is None:
+                db("""
+                    INSERT INTO votes
+                      (realm,resource_id,version,username,vote,
+                       time,changetime)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s)
+                """, (resource.realm, to_unicode(resource.id),
+                      resource.version, get_reporter_id(req), vote,
+                      now_ts, now_ts))
 
     def reparent_votes(self, resource, old_id):
         """Update resource reference of votes on a renamed resource."""
-        db = self.env.get_db_cnx()
-        cursor = db.cursor()
-        cursor.execute("""
+        self.env.db_transaction("""
             UPDATE votes
                SET resource_id=%s
              WHERE realm=%s
                AND resource_id=%s
-        """, (to_unicode(resource.id), resource.realm, to_unicode(old_id)))
-        db.commit()
+            """, (to_unicode(resource.id), resource.realm,
+                  to_unicode(old_id)))
 
     def delete_votes(self, resource):
         """Delete votes for a resource."""
         args = list((resource.realm, to_unicode(resource.id)))
         if resource.version:
             args.append(resource.version)
-        db = self.env.get_db_cnx()
-        cursor = db.cursor()
-        cursor.execute("""
+        self.env.db_transaction("""
             DELETE
               FROM votes
              WHERE realm=%%s
                AND resource_id=%%s%s
-        """ % (resource.version and ' AND version=%s' or ''), args)
-        db.commit()
+            """ % (' AND version=%s' if resource.version else ''), args)
 
     def get_votes(self, req, resource=None, top=0):
         """Return most recent votes, optionally only for one resource."""
-        args = resource and [resource.realm, to_unicode(resource.id)] or []
+        args = [resource.realm, to_unicode(resource.id)] if resource else []
         if top:
             args.append(top)
-        db = self.env.get_db_cnx()
-        cursor = db.cursor()
-        cursor.execute("""
+        for row in self.env.db_query("""
             SELECT realm,resource_id,vote,username,changetime
               FROM votes
              WHERE changetime is not NULL%s
              ORDER BY changetime DESC%s
-        """ % (resource and ' AND realm=%s AND resource_id=%s' or '',
-               top and ' LIMIT %s' or ''), args)
-        rows = cursor.fetchall()
-        for row in rows:
+            """ % (' AND realm=%s AND resource_id=%s' if resource else '',
+                   ' LIMIT %s' if top else ''), args):
             yield row
 
     def get_total_vote_count(self, realm):
         """Return the total vote count for a realm, like 'ticket'."""
-        db = self.env.get_db_cnx()
-        cursor = db.cursor()
-        cursor.execute('SELECT sum(vote) FROM votes WHERE resource LIKE %s',
-                       (realm + '%',))
-        total = cursor.fetchone()[0] or 0
-        cursor.execute("""
-            SELECT sum(vote)
-              FROM votes
-             WHERE vote < 0
-               AND resource LIKE %s
-        """, (realm + '%',))
-        negative = cursor.fetchone()[0] or 0
-        cursor.execute("""
-            SELECT sum(vote)
-              FROM votes
-             WHERE vote > 0
-               AND resource=%s
-        """, (realm + '%',))
-        positive = cursor.fetchone()[0] or 0
-        return (negative, total, positive)
+        with self.env.db_query as db:
+            total = negative = positive = 0
+            for sum_vote, in db(
+                    'SELECT sum(vote) FROM votes WHERE resource LIKE %s',
+                    (realm + '%',)):
+                total = sum_vote
+            for sum_vote, in db("""
+                    SELECT sum(vote)
+                      FROM votes
+                     WHERE vote < 0
+                       AND resource LIKE %s
+                    """, (realm + '%',)):
+                negative = sum_vote
+            for sum_vote, in db("""
+                    SELECT sum(vote)
+                      FROM votes
+                     WHERE vote > 0
+                       AND resource=%s
+                    """, (realm + '%',)):
+                positive = sum_vote
+            return negative, total, positive
 
     def get_realm_votes(self, realm):
         """Return a dictionary of vote count for a realm."""
-        db = self.env.get_db_cnx()
-        cursor = db.cursor()
-        cursor.execute('SELECT resource FROM votes WHERE resource LIKE %s',
-                       (realm + '%',))
-        resources = set([i[0] for i in cursor.fetchall()])
+        resources = set()
+        for i, in self.env.db_query(
+                'SELECT resource FROM votes WHERE resource LIKE %s',
+                (realm + '%',)):
+            resources.add(i)
         votes = {}
         for resource in resources:
             votes[resource] = self.get_vote_counts(resource)
@@ -408,7 +390,7 @@ class VoteSystem(Component):
         match = self.path_match.match(req.path_info)
         vote, path = match.groups()
         resource = resource_from_path(self.env, path)
-        vote = vote == 'up' and +1 or -1
+        vote = +1 if vote == 'up' else -1
         old_vote = self.get_vote(req, resource)
 
         # Protect against CSRF attacks: Validate the token like done in Trac
@@ -492,6 +474,7 @@ class VoteSystem(Component):
         self.reparent_votes(page.resource, old_name)
 
     ### IWikiMacroProvider methods
+
     def get_macros(self):
         yield 'LastVoted'
         yield 'TopVoted'
@@ -519,7 +502,7 @@ class VoteSystem(Component):
             top = 5
         else:
             args, kw = parse_args(content)
-            compact = 'compact' in args and True
+            compact = 'compact' in args
             top = as_int(kw.get('top'), 5, min=0)
 
         if name == 'LastVoted':
@@ -531,12 +514,13 @@ class VoteSystem(Component):
                           author=format_author(i[3]),
                           time=format_datetime(to_datetime(i[4])))
                 lst(tag.li(tag.a(
-                    get_resource_description(env, resource, compact and
-                                             'compact' or 'default'),
+                    get_resource_description(
+                                env, resource, 
+                                'compact' if compact else 'default'),
                     href=get_resource_url(env, resource, formatter.href),
-                    title=(compact and '%+i %s' % (i[2], voted) or None)),
-                    (not compact and Markup(' %s %s' % (tag.b('%+i' % i[2]),
-                                                        voted)) or '')))
+                    title=('%+i %s' % (i[2], voted) if compact else None)),
+                    (Markup(' %s %s' % (tag.b('%+i' % i[2]),
+                                        voted)) if not compact else '')))
             return lst
 
         elif name == 'TopVoted':
@@ -547,11 +531,12 @@ class VoteSystem(Component):
                     break
                 resource = Resource(i[0], i[1])
                 lst(tag.li(tag.a(
-                    get_resource_description(env, resource, compact and
-                                             'compact' or 'default'),
+                    get_resource_description(
+                                env, resource,
+                                'compact' if compact else 'default'),
                     href=get_resource_url(env, resource, formatter.href),
-                    title=(compact and '%+i' % i[2] or None)),
-                    (not compact and ' (%+i)' % i[2] or '')))
+                    title=('%+i' % i[2] if compact else None)),
+                    (' (%+i)' % i[2] if not compact else '')))
             return lst
 
         elif name == 'VoteList':
@@ -560,13 +545,12 @@ class VoteSystem(Component):
             for i in self.get_votes(req, resource, top=top):
                 vote = _("at %(date)s",
                          date=format_datetime(to_datetime(i[4])))
-                lst(tag.li(
-                    compact and format_author(i[3]) or
+                lst(tag.li(format_author(i[3]) if compact else
                     tag_("%(count)s by %(author)s %(vote)s",
                          count=tag.b('%+i' % i[2]),
                          author=tag(format_author(i[3])),
                          vote=vote)),
-                    title=(compact and '%+i %s' % (i[2], vote) or None))
+                    title=('%+i %s' % (i[2], vote) if compact else None))
             return lst
 
     ### IEnvironmentSetupParticipant methods
@@ -574,84 +558,85 @@ class VoteSystem(Component):
     def environment_created(self):
         pass
 
-    def environment_needs_upgrade(self, db):
-        if self.get_schema_version(db) < self.schema_version:
+    def environment_needs_upgrade(self, db=None):
+        schema_ver = self.get_schema_version()
+        if schema_ver < self.schema_version:
             return True
-        elif self.get_schema_version(db) > self.schema_version:
+        elif schema_ver > self.schema_version:
             raise TracError(
                 _("A newer version of VotePlugin has been installed before, "
                   "but downgrading is unsupported."))
         return False
 
-    def upgrade_environment(self, db):
+    def upgrade_environment(self, db=None):
         """Each schema version should have its own upgrade module, named
         upgrades/dbN.py, where 'N' is the version number (int).
         """
         db_mgr = DatabaseManager(self.env)
-        schema_ver = self.get_schema_version(db)
+        schema_ver = self.get_schema_version()
 
-        cursor = db.cursor()
-        # Is this a new installation?
-        if not schema_ver:
-            # Perform a single-step install: Create plugin schema and
-            # insert default data into the database.
-            connector = db_mgr._get_connector()[0]
-            for table in self.schema:
-                for stmt in connector.to_sql(table):
-                    self.env.log.debug(stmt)
-                    cursor.execute(stmt)
-            for table, cols, vals in self.db_data:
-                cursor.executemany("INSERT INTO %s (%s) VALUES (%s)"
-                                   % (table, ','.join(cols),
-                                      ','.join(['%s' for c in cols])), vals)
-        elif schema_ver < self.schema_version:
-            # Perform incremental upgrades.
-            for i in range(schema_ver + 1, self.schema_version + 1):
-                name  = 'db%i' % i
-                try:
-                    upgrades = __import__('tracvote.upgrades', globals(),
-                                          locals(), [name])
-                    script = getattr(upgrades, name)
-                except AttributeError:
-                    raise TracError(_("No upgrade module for version "
-                                      "%(num)i (%(version)s.py)",
-                                      num=i, version=name))
-                script.do_upgrade(self.env, i, cursor)
-        else:
-            # Obsolete call handled gracefully.
-            return
-        cursor.execute("""
-            UPDATE system
-               SET value=%s
-             WHERE name='vote_version'
-            """, (self.schema_version,))
-        self.log.info("Upgraded VotePlugin db schema from version %d to %d"
-                      % (schema_ver, self.schema_version))
-        db.commit()
+        with self.env.db_transaction as db:
+            cursor = db.cursor()
+            # Is this a new installation?
+            if not schema_ver:
+                # Perform a single-step install: Create plugin schema and
+                # insert default data into the database.
+                connector = db_mgr._get_connector()[0]
+                for table in self.schema:
+                    for stmt in connector.to_sql(table):
+                        self.env.log.debug(stmt)
+                        cursor.execute(stmt)
+                for table, cols, vals in self.db_data:
+                    cursor.executemany("INSERT INTO %s (%s) VALUES (%s)"
+                                       % (table, ','.join(cols),
+                                          ','.join(['%s' for c in cols])), vals)
+            elif schema_ver < self.schema_version:
+                # Perform incremental upgrades.
+                for i in range(schema_ver + 1, self.schema_version + 1):
+                    name = 'db%i' % i
+                    try:
+                        upgrades = __import__('tracvote.upgrades', globals(),
+                                              locals(), [name])
+                        script = getattr(upgrades, name)
+                    except AttributeError:
+                        raise TracError(_("No upgrade module for version "
+                                          "%(num)i (%(version)s.py)",
+                                          num=i, version=name))
+                    script.do_upgrade(self.env, i, cursor)
+            else:
+                # Obsolete call handled gracefully.
+                return
+            cursor.execute("""
+                UPDATE system
+                   SET value=%s
+                 WHERE name='vote_version'
+                """, (self.schema_version,))
+        self.log.info("Upgraded VotePlugin db schema from version %d to %d",
+                      schema_ver, self.schema_version)
 
     ### Internal methods
 
-    def get_schema_version(self, db=None):
+    def get_schema_version(self):
         """Return the current schema version for this plugin."""
-        db = db and db or self.env.get_db_cnx()
-        cursor = db.cursor()
-        cursor.execute("""
-            SELECT value
-              FROM system
-             WHERE name='vote_version'
-        """)
-        row = cursor.fetchone()
-        schema_ver = row and int(row[0]) or 0
-        if schema_ver > 1:
-            # The expected outcome for any recent installation.
-            return schema_ver
-        # Care for pre-tracvote-0.2 installations.
-        dburi = self.config.get('trac', 'database')
-        tables = self._get_tables(dburi, cursor)
-        if 'votes' in tables:
-            return 1
-        # This is a new installation.
-        return 0
+        schema_ver = 0
+        with self.env.db_query as db:
+            for value, in db("""
+                SELECT value
+                  FROM system
+                 WHERE name='vote_version'
+            """):
+                schema_ver = int(value)
+            if schema_ver > 1:
+                # The expected outcome for any recent installation.
+                return schema_ver
+            # Care for pre-tracvote-0.2 installations.
+            dburi = self.config.get('trac', 'database')
+            cursor = db.cursor()
+            tables = self._get_tables(dburi, cursor)
+            if 'votes' in tables:
+                return 1
+            # This is a new installation.
+            return 0
 
     def render_voter(self, req):
         path = req.path_info.strip('/')
@@ -661,7 +646,7 @@ class VoteSystem(Component):
                      alt=_("Up-vote"))
         down = tag.img(src=req.href.chrome('vote/' + self.image_map[vote][1]),
                        alt=_("Down-vote"))
-        if not 'action' in req.args and 'VOTE_MODIFY' in req.perm and \
+        if 'action' not in req.args and 'VOTE_MODIFY' in req.perm and \
                 get_reporter_id(req) != 'anonymous':
             down = tag.a(down, id='downvote',
                          href=req.href.vote('down', path,
@@ -687,14 +672,14 @@ class VoteSystem(Component):
         """Return a tuple of (body_text, title_text) describing the votes on a
         resource.
         """
-        negative, total, positive = resource and \
-                                    self.get_vote_counts(resource) or (0,0,0)
+        negative, total, positive = self.get_vote_counts(resource)\
+                                    if resource else (0, 0, 0)
         count_detail = ['%+i' % i for i in (positive, negative) if i]
         if count_detail:
             count_detail = ' (%s)' % ', '.join(count_detail)
         else:
             count_detail = ''
-        return '%+i' % total, _("Vote count%s") % count_detail
+        return '%+i' % total, _("Vote count%(detail)s", detail=count_detail)
 
     def _get_tables(self, dburi, cursor):
         """Code from TracMigratePlugin by Jun Omae (see tracmigrate.admin)."""

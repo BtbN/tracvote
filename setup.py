@@ -26,7 +26,7 @@ except ImportError:
 
 setup(
     name='TracVote',
-    version='0.2',
+    version='0.3',
     packages=find_packages(exclude=['*.tests']),
     package_data={
         'tracvote': [
