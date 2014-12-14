@@ -1,18 +1,18 @@
-# Translations template for TracVote.
+# Spanish translations for TracVote.
 # Copyright (C) 2014
 # This file is distributed under the same license as the TracVote
 # project.
-# FIRST AUTHOR <EMAIL@ADDRESS>, 2014.
 #
-#, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: TracVote 0.3\n"
 "Report-Msgid-Bugs-To: hoff.st@web.de\n"
 "POT-Creation-Date: 2014-12-14 21:12+0100\n"
-"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
-"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
-"Language-Team: LANGUAGE <LL@li.org>\n"
+"PO-Revision-Date: 2014-12-12 11:47-0300\n"
+"Last-Translator: mzunino (via transifex message)\n"
+"Language-Team: Spanish (http://www.transifex.com/projects/p/Trac_Plugin-"
+"L10N/language/es/)\n"
+"Plural-Forms: nplurals=2; plural=(n != 1)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -20,75 +20,79 @@ msgstr ""
 
 #: tracvote/__init__.py:194
 msgid "List of URL paths to allow voting on. Globs are supported."
-msgstr ""
+msgstr "Lista de URLs que permiten votar. Se aceptan globs."
 
 #: tracvote/__init__.py:402
 msgid "Secure cookies are enabled, you must use https for your requests."
-msgstr ""
+msgstr "Estan activadas las cookies seguras, el uso de httpS es un requisito. "
 
 #: tracvote/__init__.py:405
 msgid "Do you have cookies enabled?"
-msgstr ""
+msgstr "¿Has habilitado el uso de cookies?"
 
 #: tracvote/__init__.py:485
 msgid "Show most recently voted resources."
-msgstr ""
+msgstr "Muesta los recursos que han sido votados recientemente."
 
 #: tracvote/__init__.py:487
 msgid "Show listing of voted resources ordered by total score."
-msgstr ""
+msgstr "Ver la lista de recursos votados ordenados por puntos totales."
 
 #: tracvote/__init__.py:489
 msgid "Show listing of most recent votes for a resource."
-msgstr ""
+msgstr "Ver lista de vostos recientes por un recurso determinado."
 
 #: tracvote/__init__.py:515
 #, python-format
 msgid "by %(author)s at %(time)s"
-msgstr ""
+msgstr "por %(author)s en %(time)s"
 
 #: tracvote/__init__.py:547
 #, python-format
 msgid "at %(date)s"
-msgstr ""
+msgstr "en fecha %(date)s"
 
 #: tracvote/__init__.py:551
 #, python-format
 msgid "%(count)s by %(author)s %(vote)s"
-msgstr ""
+msgstr "%(count)s de %(vote)s por %(author)s"
 
 #: tracvote/__init__.py:567
 msgid ""
-"A newer version of VotePlugin has been installed before, but "
-"downgrading is unsupported."
+"A newer version of VotePlugin has been installed before, but downgrading "
+"is unsupported."
 msgstr ""
+"Una versión más nueva de VotePlugin ya se encuentra instalada, no es "
+"posible instalar una anterior."
 
 #: tracvote/__init__.py:602
 #, python-format
 msgid "No upgrade module for version %(num)i (%(version)s.py)"
-msgstr ""
+msgstr "No hay actualizaciones para la version %(num)i (%(version)s.py) del módulo"
 
 #: tracvote/__init__.py:646 tracvote/__init__.py:657
 msgid "Up-vote"
-msgstr ""
+msgstr "Voto afirmativo"
 
 #: tracvote/__init__.py:648 tracvote/__init__.py:654
 msgid "Down-vote"
-msgstr ""
+msgstr "Voto negativo"
 
 #: tracvote/__init__.py:661
 msgid ""
-"You can vote for resources on this Trac install by clicking the up-"
-"vote/down-vote arrows in the context navigation bar."
+"You can vote for resources on this Trac install by clicking the up-vote"
+"/down-vote arrows in the context navigation bar."
 msgstr ""
+"Puedes votar por recursos a instalar en este Trac dando click en las "
+"flechas «Voto por sí/Voto por no» en la barrra de navegación contextual."
 
 #: tracvote/__init__.py:682
 #, python-format
 msgid "Vote count%(detail)s"
-msgstr ""
+msgstr "Detalles de escrutinio de%(detail)s"
 
 #: tracvote/__init__.py:702
 #, python-format
 msgid "Unsupported database type \"%s\""
-msgstr ""
+msgstr "La base de datos \"%s\" no está soportada."
 

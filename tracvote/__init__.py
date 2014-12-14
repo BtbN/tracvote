@@ -192,8 +192,8 @@ class VoteSystem(Component):
                 (('vote_version', str(schema_version)),)))
 
     voteable_paths = ListOption('vote', 'paths', '/ticket*,/wiki*',
-        doc="""List of URL paths to allow voting on. Globs are supported.
-            """, doc_domain='tracvote')
+        doc="List of URL paths to allow voting on. Globs are supported.",
+        doc_domain='tracvote')
 
     ### Public methods
 
