@@ -1,0 +1,98 @@
+# Korean translations for TracVote.
+# Copyright (C) 2014
+# This file is distributed under the same license as the TracVote
+# project.
+#
+# Translators:
+# theYT <dev@theYT.net>, 2014
+msgid ""
+msgstr ""
+"Project-Id-Version: TracVote 0.3\n"
+"Report-Msgid-Bugs-To: hoff.st@web.de\n"
+"POT-Creation-Date: 2014-12-14 21:12+0100\n"
+"PO-Revision-Date: 2014-12-14 14:23+0000\n"
+"Last-Translator: theYT <dev@theYT.net>\n"
+"Language-Team: Korean (http://www.transifex.com/projects/p/Trac_Plugin-"
+"L10N/language/ko/)\n"
+"Plural-Forms: nplurals=1; plural=0\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 0.9.6\n"
+
+#: tracvote/__init__.py:194
+msgid "List of URL paths to allow voting on. Globs are supported."
+msgstr "투표를 허용할 URL 경로의 목록입니다. 아무개 문자 패턴을 사용할 수 있습니다."
+
+#: tracvote/__init__.py:402
+msgid "Secure cookies are enabled, you must use https for your requests."
+msgstr "보안 쿠키가 활성화 되어 있으므로, 요청에 HTTPS를 사용해야 합니다."
+
+#: tracvote/__init__.py:405
+msgid "Do you have cookies enabled?"
+msgstr "쿠키가 활성화 되어 있습니까?"
+
+#: tracvote/__init__.py:485
+msgid "Show most recently voted resources."
+msgstr "최근에 투표된 리소스를 표시합니다."
+
+#: tracvote/__init__.py:487
+msgid "Show listing of voted resources ordered by total score."
+msgstr "투표된 리소스의 목록을 총 점수 순으로 정렬하여 표시합니다."
+
+#: tracvote/__init__.py:489
+msgid "Show listing of most recent votes for a resource."
+msgstr "리소스에 대한 최근 투표의 목록을 표시합니다."
+
+#: tracvote/__init__.py:515
+#, python-format
+msgid "by %(author)s at %(time)s"
+msgstr "%(author)s 사용자가 %(time)s에 투표"
+
+#: tracvote/__init__.py:547
+#, python-format
+msgid "at %(date)s"
+msgstr "%(date)s에"
+
+#: tracvote/__init__.py:551
+#, python-format
+msgid "%(count)s by %(author)s %(vote)s"
+msgstr "%(author)s 사용자가 %(vote)s %(count)s점을 투표"
+
+#: tracvote/__init__.py:567
+msgid ""
+"A newer version of VotePlugin has been installed before, but downgrading "
+"is unsupported."
+msgstr "새 버전의 투표 플러그인이 설치된 적이 있으며, 다운그레이드는 지원하지 않습니다."
+
+#: tracvote/__init__.py:602
+#, python-format
+msgid "No upgrade module for version %(num)i (%(version)s.py)"
+msgstr ""
+"버전 %(num)i에 대한 업그레이드 모듈이 없습니다. (%(version)s.py)\n"
+" "
+
+#: tracvote/__init__.py:646 tracvote/__init__.py:657
+msgid "Up-vote"
+msgstr "추천"
+
+#: tracvote/__init__.py:648 tracvote/__init__.py:654
+msgid "Down-vote"
+msgstr "반대"
+
+#: tracvote/__init__.py:661
+msgid ""
+"You can vote for resources on this Trac install by clicking the up-vote"
+"/down-vote arrows in the context navigation bar."
+msgstr "이 Trac에 있는 리소스에 대해 투표하려면, 상황에 맞는 메뉴에 표시되는 추천/반대 화살표를 누릅니다."
+
+#: tracvote/__init__.py:682
+#, python-format
+msgid "Vote count%(detail)s"
+msgstr "투표 수%(detail)s"
+
+#: tracvote/__init__.py:702
+#, python-format
+msgid "Unsupported database type \"%s\""
+msgstr "데이터베이스 형식 \"%s\"이(가) 지원되지 않습니다."
+
