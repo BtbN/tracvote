@@ -26,10 +26,11 @@ from trac.db import DatabaseManager, Table, Column
 from trac.env import IEnvironmentSetupParticipant
 from trac.perm import IPermissionRequestor
 from trac.resource import Resource, ResourceSystem, get_resource_description
-from trac.resource import get_resource_url
-from trac.util import get_reporter_id
+from trac.resource import get_resource_url, resource_exists
+from trac.ticket.api import IMilestoneChangeListener
+from trac.util import as_int, get_reporter_id
 from trac.util.compat import partial
-from trac.util.datefmt import format_datetime, to_datetime, utc
+from trac.util.datefmt import format_datetime, to_datetime, to_utimestamp, utc
 from trac.util.text import to_unicode
 from trac.util.translation import domain_functions
 from trac.web.api import IRequestFilter, IRequestHandler
@@ -38,60 +39,6 @@ from trac.web.chrome import add_notice, add_script, add_stylesheet
 from trac.wiki.api import IWikiChangeListener, IWikiMacroProvider, parse_args
 
 _, add_domain, tag_ = domain_functions('tracvote', ('_', 'add_domain', 'tag_'))
-
-# Provide `resource_exists`, that has been backported to Trac 0.11.8 only.
-try:
-    from trac.resource import resource_exists
-    resource_check = True
-except ImportError:
-    def resource_exists(env, resource):
-        """Checks for resource existence without actually instantiating a
-        model.
-
-        :return: `True`, if the resource exists, `False` if it doesn't
-        and `None` in case no conclusion could be made (i.e. when
-        `IResourceManager.resource_exists` is not implemented).
-        """
-        manager = ResourceSystem(env).get_resource_manager(resource.realm)
-        if manager and hasattr(manager, 'resource_exists'):
-            return manager.resource_exists(resource)
-        elif resource.id is None:
-            return False
-    resource_check = False
-
-# Provide functions, that have been introduced in Trac 0.12.
-
-try:
-    from trac.util import as_int
-except ImportError:
-    def as_int(s, default, min=None, max=None):
-        """Convert s to an int and limit it to the given range, or
-        return default if unsuccessful (copied verbatim from Trac 1.0).
-        """
-        try:
-            value = int(s)
-        except (TypeError, ValueError):
-            return default
-        if min is not None and value < min:
-            value = min
-        if max is not None and value > max:
-            value = max
-        return value
-
-try:
-    from trac.util.datefmt import to_utimestamp
-except ImportError:
-    from trac.util.datefmt import to_timestamp
-    def to_utimestamp(dt):
-        return to_timestamp(dt) * 1000000
-
-# That interface has been introduced in Trac 0.12 too.
-has_milestonechangelistener = False
-try:
-    from trac.ticket.api import IMilestoneChangeListener
-    has_milestonechangelistener = True
-except ImportError:
-    has_milestonechangelistener = False
 
 
 def get_versioned_resource(env, resource):
@@ -136,9 +83,7 @@ def resource_from_path(env, path):
         if path.startswith(realm):
             resource_id = re.sub(realm, '', path, 1).lstrip('/')
             resource = Resource(realm, resource_id)
-            if not resource_check:
-                return resource
-            elif resource_exists(env, resource) in (None, True):
+            if resource_exists(env, resource) in (None, True):
                 return get_versioned_resource(env, resource)
 
 
@@ -151,14 +96,13 @@ class VoteSystem(Component):
         add_domain(self.env.path, locale_dir)
 
     implements(IEnvironmentSetupParticipant,
+               IMilestoneChangeListener,
                IPermissionRequestor,
                IRequestFilter,
                IRequestHandler,
                ITemplateProvider,
                IWikiChangeListener,
                IWikiMacroProvider)
-    if has_milestonechangelistener:
-        implements(IMilestoneChangeListener)
 
     image_map = {-1: ('aupgray.png', 'adownmod.png'),
                   0: ('aupgray.png', 'adowngray.png'),
@@ -357,7 +301,7 @@ class VoteSystem(Component):
         votes = self.get_realm_votes(realm)
         if not votes:
             return 0
-        return max([i[1] for i in votes.values()])
+        return max(i[1] for i in votes.values())
 
     ### IMilestoneChangeListener methods
 
@@ -589,7 +533,7 @@ class VoteSystem(Component):
                 for table, cols, vals in self.db_data:
                     cursor.executemany("INSERT INTO %s (%s) VALUES (%s)"
                                        % (table, ','.join(cols),
-                                          ','.join(['%s' for c in cols])), vals)
+                                          ','.join('%s' for c in cols)), vals)
             elif schema_ver < self.schema_version:
                 # Perform incremental upgrades.
                 for i in range(schema_ver + 1, self.schema_version + 1):
@@ -702,4 +646,4 @@ class VoteSystem(Component):
             raise TracError(_('Unsupported database type "%s"')
                             % dburi.split(':')[0])
         cursor.execute(sql)
-        return sorted([row[0] for row in cursor])
+        return sorted(row[0] for row in cursor)

@@ -20,7 +20,7 @@ from trac.ticket.model import Ticket
 from trac.web.chrome import Chrome
 from trac.wiki.model import WikiPage
 
-from tracvote import VoteSystem, resource_check
+from tracvote import VoteSystem
 
 
 _ACTIONS = dict(view='VOTE_VIEW', modify='VOTE_MODIFY')
@@ -131,9 +131,8 @@ class EnvironmentSetupTestCase(unittest.TestCase):
                 elif realm == 'wiki':
                     w_votes.append(id)
             self.assertTrue('1' in t_votes)
-            if resource_check:
-                self.assertFalse('2' in t_votes)
-                self.assertFalse('DeletedPage' in w_votes)
+            self.assertFalse('2' in t_votes)
+            self.assertFalse('DeletedPage' in w_votes)
             self.assertTrue('ExistingPage' in w_votes)
 
 
