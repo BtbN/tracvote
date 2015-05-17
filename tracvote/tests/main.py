@@ -15,12 +15,13 @@ import unittest
 from trac.db import Table, Column, Index
 from trac.db.api import DatabaseManager, get_column_names
 from trac.perm import PermissionCache, PermissionSystem
+from trac.resource import Resource
 from trac.test import EnvironmentStub, Mock
 from trac.ticket.model import Ticket
 from trac.web.chrome import Chrome
 from trac.wiki.model import WikiPage
 
-from tracvote import VoteSystem
+from tracvote import VoteSystem, resource_from_path
 
 
 _ACTIONS = dict(view='VOTE_VIEW', modify='VOTE_MODIFY')
@@ -190,10 +191,30 @@ class VoteSystemTestCase(unittest.TestCase):
         self.assertTrue(self.votes in Chrome(self.env).template_providers)
 
 
+class ResourceFromPathTestCase(unittest.TestCase):
+
+    def setUp(self):
+        self.env = EnvironmentStub()
+        Ticket(self.env).insert()
+
+    def test_ticket_resource_exists(self):
+        resource = resource_from_path(self.env, '/ticket/1')
+        self.assertEqual(Resource('ticket', '1'), resource)
+
+    def test_ticket_resource_not_exists(self):
+        resource = resource_from_path(self.env, '/ticket/2')
+        self.assertIsNone(resource)
+
+    def test_ticket_resource_invalid(self):
+        resource = resource_from_path(self.env, '/ticket/a')
+        self.assertIsNone(resource)
+
+
 def suite():
     suite = unittest.TestSuite()
     suite.addTest(unittest.makeSuite(EnvironmentSetupTestCase))
     suite.addTest(unittest.makeSuite(VoteSystemTestCase))
+    suite.addTest(unittest.makeSuite(ResourceFromPathTestCase))
     return suite
 
 if __name__ == '__main__':

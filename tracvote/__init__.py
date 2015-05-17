@@ -69,6 +69,16 @@ def get_versioned_resource(env, resource):
     return resource
 
 
+def _resource_exists(env, resource):
+    """Avoid exception in database for Trac < 1.0.7.
+    http://trac.edgewall.org/ticket/12076
+    """
+    try:
+        return resource_exists(env, resource)
+    except env.db_exc.DatabaseError:
+        return False
+
+
 def resource_from_path(env, path):
     """Find realm and resource ID from resource URL.
 
@@ -83,7 +93,7 @@ def resource_from_path(env, path):
         if path.startswith(realm):
             resource_id = re.sub(realm, '', path, 1).lstrip('/')
             resource = Resource(realm, resource_id)
-            if resource_exists(env, resource) in (None, True):
+            if _resource_exists(env, resource) in (None, True):
                 return get_versioned_resource(env, resource)
 
 
