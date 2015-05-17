@@ -52,10 +52,10 @@ def get_versioned_resource(env, resource):
     if realm == 'ticket':
         for tkt_changes, in env.db_query("""
                 SELECT SUM(c.change) FROM (
-                    SELECT 1 as change
-                      FROM ticket_change
-                     WHERE ticket=%s
-                     GROUP BY time) AS c
+                  SELECT 1 as change
+                    FROM ticket_change
+                  WHERE ticket=%s
+                  GROUP BY time) AS c
                 """, (resource.id,)):
             resource.version = tkt_changes
     elif realm == 'wiki':
