@@ -48,16 +48,13 @@ def get_versioned_resource(env, resource):
     the current version has to be retrieved separately.
     """
     realm = resource.realm
-    resource.version = 0
     if realm == 'ticket':
-        for tkt_changes, in env.db_query("""
-                SELECT SUM(c.change) FROM (
-                  SELECT 1 as change
-                    FROM ticket_change
-                  WHERE ticket=%s
-                  GROUP BY time) AS c
+        for count, in env.db_query("""
+                SELECT COUNT(DISTINCT time)
+                FROM ticket_change WHERE ticket=%s
                 """, (resource.id,)):
-            resource.version = tkt_changes
+            if count !=0:
+                resource.version = count
     elif realm == 'wiki':
         for version, in env.db_query("""
                 SELECT version
