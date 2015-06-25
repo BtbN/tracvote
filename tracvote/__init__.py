@@ -99,8 +99,12 @@ class VoteSystem(Component):
 
     def __init__(self):
         """Set up translation domain"""
-        locale_dir = resource_filename(__name__, 'locale')
-        add_domain(self.env.path, locale_dir)
+        try:
+            locale_dir = resource_filename(__name__, 'locale')
+        except KeyError:
+            pass
+        else:
+            add_domain(self.env.path, locale_dir)
 
     implements(IEnvironmentSetupParticipant,
                IMilestoneChangeListener,
@@ -466,7 +470,7 @@ class VoteSystem(Component):
                           time=format_datetime(to_datetime(i[4])))
                 lst(tag.li(tag.a(
                     get_resource_description(
-                                env, resource, 
+                                env, resource,
                                 'compact' if compact else 'default'),
                     href=get_resource_url(env, resource, formatter.href),
                     title=('%+i %s' % (i[2], voted) if compact else None)),

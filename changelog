@@ -2,6 +2,13 @@ Author: Alec Thomas <alec@swapoff.org>
 Maintainer: Ryan J Ollos <ryan.j.ollos@gmail.com>
 Maintainer: Steffen Hoffmann <hoff.st@web.de>
 
+tracvote-0.3.0 (not yet released) - trunk
+resolved issues
+ * #12417: KeyError when Babel is not installed.
+
+new features
+
+
 tracvote-0.2.0 (not yet released) - branch 0.11
  resolved issues
  * #7744: Add token to href to prevent CSRF
@@ -26,7 +33,7 @@ tracvote-0.1.5 (23-Mar-2013) - branch 0.11
 
 tracvote-0.1.4 (22-Mar-2013) - branch 0.11
  resolved issues
- * #3655: Sample report to sort tickets by the number of votes 
+ * #3655: Sample report to sort tickets by the number of votes
  * #8597: Incorrect URL return when voting for ticket
 
 
