@@ -2,7 +2,7 @@ Author: Alec Thomas <alec@swapoff.org>
 Maintainer: Ryan J Ollos <ryan.j.ollos@gmail.com>
 Maintainer: Steffen Hoffmann <hoff.st@web.de>
 
-tracvote-0.2.0 (not yet released) - branch 0.11
+tracvote-0.2.0 (2015-06-25) - branch 0.11
  resolved issues
  * #7744: Add token to href to prevent CSRF
  * #11037: Wrongly uses `re.match` for the `[vote] paths` setting
@@ -16,6 +16,7 @@ tracvote-0.2.0 (not yet released) - branch 0.11
  * #10942: Improvements for plugin's db schema
    by adding db schema registration/versioning and common modular upgrade code
  * add `IWikiChangeListener` functions to auto-update wiki resource entries
+ * #10943: i18n support
 
 
 tracvote-0.1.5 (23-Mar-2013) - branch 0.11
