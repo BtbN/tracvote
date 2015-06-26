@@ -2,11 +2,14 @@ Author: Alec Thomas <alec@swapoff.org>
 Maintainer: Ryan J Ollos <ryan.j.ollos@gmail.com>
 Maintainer: Steffen Hoffmann <hoff.st@web.de>
 
-tracvote-0.3.0 (not yet released) - trunk
+tracvote-0.3.0 (2015-06-26) - trunk
 resolved issues
+ * #12253: Trap exceptions from non-existent resources.
+ * #12351: Fixed test failures on MySQL.
  * #12417: KeyError when Babel is not installed.
 
 new features
+ * #12048: Uses Trac 1.0 database API (Trac 1.0 and later supported).
 
 
 tracvote-0.2.0 (2015-06-25) - branch 0.11
