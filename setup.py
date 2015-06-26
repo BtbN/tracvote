@@ -26,7 +26,7 @@ except ImportError:
 
 setup(
     name='TracVote',
-    version='0.3.0',
+    version='0.4.0',
     packages=find_packages(exclude=['*.tests']),
     package_data={
         'tracvote': [
@@ -44,7 +44,7 @@ setup(
 
     test_suite = 'tracvote.tests.suite',
     zip_safe=True,
-    install_requires = ['Trac >= 0.11'],
+    install_requires = ['Trac'],
     url='http://trac-hacks.org/wiki/VotePlugin',
     description='A plugin for voting on Trac resources.',
     entry_points = {'trac.plugins': ['tracvote = tracvote']},
