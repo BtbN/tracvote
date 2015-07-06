@@ -16,9 +16,13 @@ from trac.db import Table, Column, Index
 from trac.db.api import DatabaseManager, get_column_names
 from trac.perm import PermissionCache, PermissionSystem
 from trac.resource import Resource
-from trac.test import EnvironmentStub, Mock
+from trac.test import EnvironmentStub, Mock, locale_en
 from trac.ticket.model import Ticket
+from trac.ticket.web_ui import TicketModule
+from trac.util.datefmt import utc
+from trac.web.api import HTTPForbidden, RequestDone
 from trac.web.chrome import Chrome
+from trac.web.main import RequestDispatcher
 from trac.wiki.model import WikiPage
 
 from tracvote import VoteSystem, resource_from_path
@@ -140,8 +144,7 @@ class EnvironmentSetupTestCase(unittest.TestCase):
 class VoteSystemTestCase(unittest.TestCase):
 
     def setUp(self):
-        self.env = EnvironmentStub(default_data=True,
-                                   enable=['trac.*', 'tracvote.*'])
+        self.env = EnvironmentStub(enable=['trac.*', 'tracvote.*'])
         # OK, this is a quick hack... I didn't have time to investigate
         # why I got ''Cannot find implementation(s) of the `IPermissionPolicy`
         # interface named `ReadonlyWikiPolicy`.''
@@ -160,18 +163,29 @@ class VoteSystemTestCase(unittest.TestCase):
         self.votes.upgrade_environment()
 
     def tearDown(self):
+        self.env.reset_db()
         # Really close db connections.
         self.env.shutdown()
         shutil.rmtree(self.env.path)
 
     # Helpers
 
+    def create_request(self, authname='anonymous', **kwargs):
+        kw = {'perm': PermissionCache(self.env, authname), 'args': {},
+              'callbacks': {}, 'path_info': '', 'form_token': None,
+              'href': self.env.href, 'abs_href': self.env.abs_href,
+              'tz': utc, 'locale': None, 'lc_time': locale_en,
+              'session': {},
+              'authname': authname, 'chrome': {'notices': [], 'warnings': []},
+              'method': None, 'get_header': lambda v: None, 'is_xhr': False}
+        kw.update(kwargs)
+        def send(self, content, content_type='text/html', status=200):
+            raise RequestDone
+        return Mock(send=send, **kw)
+
     def _revert_schema_init(self):
         with self.env.db_transaction as db:
             db("DROP TABLE IF EXISTS votes")
-            db("DELETE FROM system WHERE name='vote_version'")
-            db("DELETE FROM permission WHERE action %s" % db.like(),
-               ('VOTE_%',))
 
     # Tests
 
@@ -189,6 +203,36 @@ class VoteSystemTestCase(unittest.TestCase):
 
     def test_resource_provider(self):
         self.assertTrue(self.votes in Chrome(self.env).template_providers)
+
+    def test_voter_rendered_on_ticket(self):
+        """Voter rendered when viewing ticket with VOTE_VIEW."""
+        TicketModule(self.env)
+        Ticket(self.env).insert()
+        PermissionSystem(self.env).grant_permission('user', 'TICKET_VIEW')
+
+        req = self.create_request('user', path_info='/ticket/1', method='GET')
+        dispatcher = RequestDispatcher(self.env)
+
+        self.assertRaises(RequestDone, dispatcher.dispatch, req)
+        found = False
+        for elem in req.chrome.get('ctxtnav', []):
+            found |= '<span id="vote" title="Vote count">' in unicode(elem)
+        self.assertTrue(found)
+        self.assertTrue('shown_vote_message' in req.session)
+
+    def test_voter_not_rendered_on_ticket_permission_error(self):
+        """Voter not rendered on permission error."""
+        TicketModule(self.env)
+        Ticket(self.env).insert()
+
+        req = self.create_request('user', path_info='/ticket/1', method='GET')
+        dispatcher = RequestDispatcher(self.env)
+
+        self.assertRaises(HTTPForbidden, dispatcher.dispatch, req)
+        for elem in req.chrome.get('ctxtnav', []):
+            self.assertFalse('<span id="vote" title="Vote count">'
+                             in unicode(elem))
+        self.assertFalse('shown_vote_message' in req.session)
 
 
 class ResourceFromPathTestCase(unittest.TestCase):

@@ -2,6 +2,13 @@ Author: Alec Thomas <alec@swapoff.org>
 Maintainer: Ryan J Ollos <ryan.j.ollos@gmail.com>
 Maintainer: Steffen Hoffmann <hoff.st@web.de>
 
+tracvote-0.4.0 (Not yet released) - trunk
+resolved issues
+ * #12105: Don't render voter if permission denied on resource
+
+new features
+
+
 tracvote-0.3.0 (2015-06-26) - trunk
 resolved issues
  * #12253: Trap exceptions from non-existent resources.

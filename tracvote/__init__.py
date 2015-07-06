@@ -387,7 +387,7 @@ class VoteSystem(Component):
         return handler
 
     def post_process_request(self, req, template, data, content_type):
-        if 'VOTE_VIEW' in req.perm:
+        if template is not None and 'VOTE_VIEW' in req.perm:
             for path in self.voteable_paths:
                 if fnmatchcase(req.path_info, path) and \
                         resource_from_path(self.env, req.path_info):
