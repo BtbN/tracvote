@@ -40,9 +40,6 @@ from trac.wiki.api import IWikiChangeListener, IWikiMacroProvider, parse_args
 
 _, add_domain, tag_ = domain_functions('tracvote', ('_', 'add_domain', 'tag_'))
 
-import pkg_resources
-pkg_resources.require('Trac >= 1.0')
-
 
 def get_versioned_resource(env, resource):
     """Find the current version for a Trac resource.
