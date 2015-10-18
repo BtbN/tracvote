@@ -1,3 +1,12 @@
+# -*- coding: utf-8 -*-
+#
+# Copyright (C) 2010-2015 Ryan J Ollos <ryan.j.ollos@gmail.com>
+# Copyright (C) 2013-2015 Steffen Hoffmann <hoff.st@web.de>
+# All rights reserved.
+#
+# This software is licensed as described in the file COPYING, which
+# you should have received as part of this distribution.
+
 import re
 
 from trac.db import Table, Column, Index, DatabaseManager
@@ -16,6 +25,7 @@ schema = [
         Column('changetime', type='int64'),
         ]
     ]
+
 
 def do_upgrade(env, ver, cursor):
     """Changes to votes db table:
