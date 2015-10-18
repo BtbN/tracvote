@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 #
+# Copyright (C) 2010-2015 Ryan J Ollos <ryan.j.ollos@gmail.com>
 # Copyright (C) 2013 Steffen Hoffmann <hoff.st@web.de>
 # All rights reserved.
 #
 # This software is licensed as described in the file COPYING, which
 # you should have received as part of this distribution.
-#
-# Author: Steffen Hoffmann
 
 import shutil
 import tempfile
@@ -111,8 +110,10 @@ class EnvironmentSetupTestCase(unittest.TestCase):
                 INSERT INTO votes
                        (resource,username,vote)
                 VALUES (%s,%s,%s)
-            """, (('ticket/1','user',-1), ('ticket/2','user',1),
-                  ('wiki/DeletedPage','user',-1), ('wiki/ExistingPage','user',1)))
+            """, (('ticket/1', 'user', -1),
+                  ('ticket/2', 'user', 1),
+                  ('wiki/DeletedPage', 'user', -1),
+                  ('wiki/ExistingPage', 'user', 1)))
             # Resources must exist for successful data migration.
             t = Ticket(self.env)
             t['summary'] = 'test ticket'
@@ -149,9 +150,8 @@ class VoteSystemTestCase(unittest.TestCase):
         # why I got ''Cannot find implementation(s) of the `IPermissionPolicy`
         # interface named `ReadonlyWikiPolicy`.''
         self.env.config.set('trac', 'permission_policies',
-                            ', '.join(
-                ['DefaultPermissionPolicy',
-                 'LegacyAttachmentPolicy']))
+                            ', '.join(['DefaultPermissionPolicy',
+                                       'LegacyAttachmentPolicy']))
         self.env.path = tempfile.mkdtemp()
         self.perm = PermissionSystem(self.env)
         self.req = Mock()
@@ -179,8 +179,10 @@ class VoteSystemTestCase(unittest.TestCase):
               'authname': authname, 'chrome': {'notices': [], 'warnings': []},
               'method': None, 'get_header': lambda v: None, 'is_xhr': False}
         kw.update(kwargs)
+
         def send(self, content, content_type='text/html', status=200):
             raise RequestDone
+
         return Mock(send=send, **kw)
 
     def _revert_schema_init(self):

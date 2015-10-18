@@ -2,6 +2,10 @@
 # -*- coding: utf-8 -*-
 #
 # Copyright (C) 2008 Alec Thomas <alec@swapoff.org>
+# Copyright (C) 2009 Noah Kantrowitz <noah@coderanger.net>
+# Copyright (C) 2009 Jeff Hammel <jhammel@openplans.org>
+# Copyright (C) 2010-2015 Ryan J Ollos <ryan.j.ollos@gmail.com>
+# Copyright (C) 2013-2015 Steffen Hoffmann <hoff.st@web.de>
 # All rights reserved.
 #
 # This software is licensed as described in the file COPYING, which
@@ -27,6 +31,11 @@ except ImportError:
 setup(
     name='TracVote',
     version='0.4.0',
+    author='Alec Thomas',
+    maintainer='Ryan J Ollos',
+    maintainer_email='ryan.j.ollos@gmail.com',
+    url='https://trac-hacks.org/wiki/VotePlugin',
+    license='3-Clause BSD',
     packages=find_packages(exclude=['*.tests']),
     package_data={
         'tracvote': [
@@ -36,17 +45,10 @@ setup(
             'locale/*/LC_MESSAGES/*.mo'
         ]
     },
-    author='Alec Thomas',
-    maintainer = 'Ryan J Ollos',
-    maintainer_email = 'ryan.j.ollos@gmail.com',
-
-    license='BSD',
-
-    test_suite = 'tracvote.tests.suite',
+    test_suite='tracvote.tests.suite',
     zip_safe=True,
-    install_requires = ['Trac'],
-    url='http://trac-hacks.org/wiki/VotePlugin',
+    install_requires=['Trac'],
     description='A plugin for voting on Trac resources.',
-    entry_points = {'trac.plugins': ['tracvote = tracvote']},
+    entry_points={'trac.plugins': ['tracvote = tracvote']},
     **extra
 )

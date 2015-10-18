@@ -3,14 +3,14 @@
 # Copyright (C) 2008 Alec Thomas <alec@swapoff.org>
 # Copyright (C) 2009 Noah Kantrowitz <noah@coderanger.net>
 # Copyright (C) 2009 Jeff Hammel <jhammel@openplans.org>
-# Copyright (C) 2013 Steffen Hoffmann <hoff.st@web.de>
+# Copyright (C) 2010-2015 Ryan J Ollos <ryan.j.ollos@gmail.com>
+# Copyright (C) 2013-2015 Steffen Hoffmann <hoff.st@web.de>
 # All rights reserved.
 #
 # This software is licensed as described in the file COPYING, which
 # you should have received as part of this distribution.
-#
-# Author: Alec Thomas
 
+import pkg_resources
 import re
 from fnmatch import fnmatchcase
 
@@ -40,7 +40,6 @@ from trac.wiki.api import IWikiChangeListener, IWikiMacroProvider, parse_args
 
 _, add_domain, tag_ = domain_functions('tracvote', ('_', 'add_domain', 'tag_'))
 
-import pkg_resources
 pkg_resources.require('Trac >= 1.0')
 
 
@@ -56,7 +55,7 @@ def get_versioned_resource(env, resource):
                 SELECT COUNT(DISTINCT time)
                 FROM ticket_change WHERE ticket=%s
                 """, (resource.id,)):
-            if count !=0:
+            if count != 0:
                 resource.version = count
     elif realm == 'wiki':
         for version, in env.db_query("""
@@ -139,7 +138,7 @@ class VoteSystem(Component):
     schema_version = 2
 
     # Default database values
-    #(table, (column1, column2), ((row1col1, row1col2), (row2col1, row2col2)))
+    # (table, (column1, column2), ((row1col1, row1col2), (row2col1, row2col2)))
     db_data = (
         ('permission',
             ('username', 'action'),
@@ -153,7 +152,7 @@ class VoteSystem(Component):
         doc="List of URL paths to allow voting on. Globs are supported.",
         doc_domain='tracvote')
 
-    ### Public methods
+    # Public methods
 
     def get_top_voted(self, req, realm=None, top=0):
         """Return resources ordered top-down by vote count."""
@@ -317,7 +316,7 @@ class VoteSystem(Component):
             return 0
         return max(i[1] for i in votes.values())
 
-    ### IMilestoneChangeListener methods
+    # IMilestoneChangeListener methods
 
     def milestone_created(self, milestone):
         """Called when a milestone is created."""
@@ -333,12 +332,13 @@ class VoteSystem(Component):
         """Called when a milestone is deleted."""
         self.delete_votes(milestone.resource)
 
-    ### IPermissionRequestor method
+    # IPermissionRequestor method
+
     def get_permission_actions(self):
         action = 'VOTE_VIEW'
         return [('VOTE_MODIFY', [action]), action]
 
-    ### IRequestHandler methods
+    # IRequestHandler methods
 
     def match_request(self, req):
         return 'VOTE_VIEW' in req.perm and self.path_match.match(req.path_info)
@@ -381,7 +381,7 @@ class VoteSystem(Component):
         req.redirect(get_resource_url(self.env, resource(version=None),
                                       req.href))
 
-    ### IRequestFilter methods
+    # IRequestFilter methods
 
     def pre_process_request(self, req, handler):
         return handler
@@ -395,16 +395,15 @@ class VoteSystem(Component):
                     break
         return template, data, content_type
 
-    ### ITemplateProvider methods
+    # ITemplateProvider methods
 
     def get_templates_dirs(self):
         return []
-        #resource_filename(__name__, 'templates')]
 
     def get_htdocs_dirs(self):
         return [('vote', resource_filename(__name__, 'htdocs'))]
 
-    ### IWikiChangeListener methods
+    # IWikiChangeListener methods
 
     def wiki_page_added(self, page):
         """Called whenever a new Wiki page is added."""
@@ -431,7 +430,7 @@ class VoteSystem(Component):
         page.resource.id = page.name
         self.reparent_votes(page.resource, old_name)
 
-    ### IWikiMacroProvider methods
+    # IWikiMacroProvider methods
 
     def get_macros(self):
         yield 'LastVoted'
@@ -449,7 +448,7 @@ class VoteSystem(Component):
     def expand_macro(self, formatter, name, content):
         env = formatter.env
         req = formatter.req
-        if not 'VOTE_VIEW' in req.perm:
+        if 'VOTE_VIEW' not in req.perm:
             return
         # Simplify function calls.
         format_author = partial(Chrome(self.env).format_author, req)
@@ -511,7 +510,7 @@ class VoteSystem(Component):
                     title=('%+i %s' % (i[2], vote) if compact else None))
             return lst
 
-    ### IEnvironmentSetupParticipant methods
+    # IEnvironmentSetupParticipant methods
 
     def environment_created(self):
         pass
@@ -572,7 +571,7 @@ class VoteSystem(Component):
         self.log.info("Upgraded VotePlugin db schema from version %d to %d",
                       schema_ver, self.schema_version)
 
-    ### Internal methods
+    # Internal methods
 
     def get_schema_version(self):
         """Return the current schema version for this plugin."""
@@ -630,8 +629,8 @@ class VoteSystem(Component):
         """Return a tuple of (body_text, title_text) describing the votes on a
         resource.
         """
-        negative, total, positive = self.get_vote_counts(resource)\
-                                    if resource else (0, 0, 0)
+        negative, total, positive = \
+            self.get_vote_counts(resource) if resource else (0, 0, 0)
         count_detail = ['%+i' % i for i in (positive, negative) if i]
         if count_detail:
             count_detail = ' (%s)' % ', '.join(count_detail)
