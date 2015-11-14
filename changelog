@@ -7,6 +7,8 @@ resolved issues
  * #12105: Don't render voter if permission denied on resource
 
 new features
+ * Dropped support for Trac < 1.0
+ * #12432: Fine-grained permission checks when using AuthzPolicy
 
 
 tracvote-0.3.0 (2015-06-26) - trunk
