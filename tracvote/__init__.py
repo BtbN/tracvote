@@ -121,7 +121,7 @@ class VoteSystem(Component):
                   0: ('aupgray.png', 'adowngray.png'),
                  +1: ('aupmod.png', 'adowngray.png')}
 
-    path_match = re.compile(r'/vote/(up|down)/(.*)')
+    path_re = re.compile(r'/vote/(up|down)/(.*)')
 
     schema = [
         Table('votes', key=('realm', 'resource_id', 'username', 'vote'))[
@@ -341,13 +341,17 @@ class VoteSystem(Component):
     # IRequestHandler methods
 
     def match_request(self, req):
-        return 'VOTE_VIEW' in req.perm and self.path_match.match(req.path_info)
+        match = self.path_re.match(req.path_info)
+        if match:
+            req.args['vote'] = match.group(1)
+            req.args['path'] = match.group(2)
+            return True
 
     def process_request(self, req):
-        req.perm.require('VOTE_MODIFY')
-        match = self.path_match.match(req.path_info)
-        vote, path = match.groups()
+        vote, path = req.args.get('vote'), req.args.get('path')
         resource = resource_from_path(self.env, path)
+        req.perm(resource).require('VOTE_MODIFY')
+
         vote = +1 if vote == 'up' else -1
         old_vote = self.get_vote(req, resource)
 
@@ -387,10 +391,11 @@ class VoteSystem(Component):
         return handler
 
     def post_process_request(self, req, template, data, content_type):
-        if template is not None and 'VOTE_VIEW' in req.perm:
+        if template is not None:
             for path in self.voteable_paths:
-                if fnmatchcase(req.path_info, path) and \
-                        resource_from_path(self.env, req.path_info):
+                resource = resource_from_path(self.env, req.path_info)
+                if fnmatchcase(req.path_info, path) and resource and \
+                        'VOTE_VIEW' in req.perm(resource):
                     self.render_voter(req)
                     break
         return template, data, content_type
@@ -448,7 +453,7 @@ class VoteSystem(Component):
     def expand_macro(self, formatter, name, content):
         env = formatter.env
         req = formatter.req
-        if 'VOTE_VIEW' not in req.perm:
+        if 'VOTE_VIEW' not in req.perm('vote'):
             return
         # Simplify function calls.
         format_author = partial(Chrome(self.env).format_author, req)
@@ -603,7 +608,8 @@ class VoteSystem(Component):
                      alt=_("Up-vote"))
         down = tag.img(src=req.href.chrome('vote/' + self.image_map[vote][1]),
                        alt=_("Down-vote"))
-        if 'action' not in req.args and 'VOTE_MODIFY' in req.perm and \
+        if 'action' not in req.args and \
+                'VOTE_MODIFY' in req.perm(resource) and \
                 get_reporter_id(req) != 'anonymous':
             down = tag.a(down, id='downvote',
                          href=req.href.vote('down', path,
