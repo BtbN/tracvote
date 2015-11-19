@@ -30,7 +30,7 @@ except ImportError:
 
 setup(
     name='TracVote',
-    version='0.4.0',
+    version='0.5.0',
     author='Alec Thomas',
     maintainer='Ryan J Ollos',
     maintainer_email='ryan.j.ollos@gmail.com',
