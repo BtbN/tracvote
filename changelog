@@ -4,6 +4,7 @@ Maintainer: Steffen Hoffmann <hoff.st@web.de>
 
 tracvote-0.5.0 (Not yet released) - trunk
 resolved issues
+ * #12595: Fixed traceback when viewing changesets. Regression in [15059].
 
 new features
 

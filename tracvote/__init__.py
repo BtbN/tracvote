@@ -393,11 +393,11 @@ class VoteSystem(Component):
     def post_process_request(self, req, template, data, content_type):
         if template is not None:
             for path in self.voteable_paths:
-                resource = resource_from_path(self.env, req.path_info)
-                if fnmatchcase(req.path_info, path) and resource and \
-                        'VOTE_VIEW' in req.perm(resource):
-                    self.render_voter(req)
-                    break
+                if fnmatchcase(req.path_info, path):
+                    resource = resource_from_path(self.env, req.path_info)
+                    if resource and 'VOTE_VIEW' in req.perm(resource):
+                        self.render_voter(req)
+                        break
         return template, data, content_type
 
     # ITemplateProvider methods
