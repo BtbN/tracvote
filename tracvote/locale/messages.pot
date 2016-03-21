@@ -7,9 +7,9 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: TracVote 0.5.0\n"
+"Project-Id-Version: TracVote 0.5.1\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2016-03-14 16:55-0400\n"
+"POT-Creation-Date: 2016-03-20 23:17-0700\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -22,72 +22,76 @@ msgstr ""
 msgid "List of URL paths to allow voting on. Globs are supported."
 msgstr ""
 
-#: tracvote/__init__.py:364
-msgid "Secure cookies are enabled, you must use https for your requests."
+#: tracvote/__init__.py:354
+msgid "Invalid request path. Path does not contain a valid realm."
 msgstr ""
 
 #: tracvote/__init__.py:367
+msgid "Secure cookies are enabled, you must use https for your requests."
+msgstr ""
+
+#: tracvote/__init__.py:370
 msgid "Do you have cookies enabled?"
 msgstr ""
 
-#: tracvote/__init__.py:447
+#: tracvote/__init__.py:450
 msgid "Show most recently voted resources."
 msgstr ""
 
-#: tracvote/__init__.py:449
+#: tracvote/__init__.py:452
 msgid "Show listing of voted resources ordered by total score."
 msgstr ""
 
-#: tracvote/__init__.py:451
+#: tracvote/__init__.py:454
 msgid "Show listing of most recent votes for a resource."
 msgstr ""
 
-#: tracvote/__init__.py:477
+#: tracvote/__init__.py:480
 #, python-format
 msgid "by %(author)s at %(time)s"
 msgstr ""
 
-#: tracvote/__init__.py:509
+#: tracvote/__init__.py:512
 #, python-format
 msgid "at %(date)s"
 msgstr ""
 
-#: tracvote/__init__.py:513
+#: tracvote/__init__.py:516
 #, python-format
 msgid "%(count)s by %(author)s %(vote)s"
 msgstr ""
 
-#: tracvote/__init__.py:529
+#: tracvote/__init__.py:532
 msgid ""
 "A newer version of VotePlugin has been installed before, but "
 "downgrading is unsupported."
 msgstr ""
 
-#: tracvote/__init__.py:564
+#: tracvote/__init__.py:567
 #, python-format
 msgid "No upgrade module for version %(num)i (%(version)s.py)"
 msgstr ""
 
-#: tracvote/__init__.py:608 tracvote/__init__.py:620
+#: tracvote/__init__.py:611 tracvote/__init__.py:623
 msgid "Up-vote"
 msgstr ""
 
-#: tracvote/__init__.py:610 tracvote/__init__.py:617
+#: tracvote/__init__.py:613 tracvote/__init__.py:620
 msgid "Down-vote"
 msgstr ""
 
-#: tracvote/__init__.py:624
+#: tracvote/__init__.py:627
 msgid ""
 "You can vote for resources on this Trac install by clicking the up-"
 "vote/down-vote arrows in the context navigation bar."
 msgstr ""
 
-#: tracvote/__init__.py:645
+#: tracvote/__init__.py:648
 #, python-format
 msgid "Vote count%(detail)s"
 msgstr ""
 
-#: tracvote/__init__.py:665
+#: tracvote/__init__.py:668
 #, python-format
 msgid "Unsupported database type \"%s\""
 msgstr ""
