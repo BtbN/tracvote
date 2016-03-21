@@ -350,6 +350,9 @@ class VoteSystem(Component):
     def process_request(self, req):
         vote, path = req.args.get('vote'), req.args.get('path')
         resource = resource_from_path(self.env, path)
+        if resource is None:
+            raise TracError(_("Invalid request path. Path does not "
+                              "contain a valid realm."))
         req.perm(resource).require('VOTE_MODIFY')
 
         vote = +1 if vote == 'up' else -1

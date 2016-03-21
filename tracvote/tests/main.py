@@ -19,7 +19,7 @@ from trac.test import EnvironmentStub, Mock, locale_en
 from trac.ticket.model import Ticket
 from trac.ticket.web_ui import TicketModule
 from trac.util.datefmt import utc
-from trac.web.api import HTTPForbidden, RequestDone
+from trac.web.api import HTTPForbidden, HTTPInternalError, RequestDone
 from trac.web.chrome import Chrome
 from trac.web.main import RequestDispatcher
 from trac.wiki.model import WikiPage
@@ -236,6 +236,20 @@ class VoteSystemTestCase(unittest.TestCase):
                              in unicode(elem))
         self.assertFalse('shown_vote_message' in req.session)
 
+    def test_invalid_request_path(self):
+        req = self.create_request('user',
+                                  path_info='/vote/down/invalid-realm',
+                                  method='GET')
+        dispatcher = RequestDispatcher(self.env)
+
+        try:
+            dispatcher.dispatch(req)
+        except HTTPInternalError, e:
+            self.assertEqual("500 Trac Error (Invalid request path. "
+                             "Path does not contain a valid realm.)",
+                             unicode(e))
+        else:
+            self.fail("TracError not raised.")
 
 class ResourceFromPathTestCase(unittest.TestCase):
 
