@@ -546,7 +546,7 @@ class VoteSystem(Component):
             if not schema_ver:
                 # Perform a single-step install: Create plugin schema and
                 # insert default data into the database.
-                connector = db_mgr._get_connector()[0]
+                connector = db_mgr.get_connector()[0]
                 for table in self.schema:
                     for stmt in connector.to_sql(table):
                         self.env.log.debug(stmt)

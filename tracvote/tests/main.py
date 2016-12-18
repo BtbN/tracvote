@@ -49,7 +49,7 @@ class EnvironmentSetupTestCase(unittest.TestCase):
         with self.env.db_transaction as db:
             db("DROP TABLE IF EXISTS votes")
             if schema:
-                connector = self.db_mgr._get_connector()[0]
+                connector = self.db_mgr.get_connector()[0]
                 for table in schema:
                     for stmt in connector.to_sql(table):
                         db(stmt)
