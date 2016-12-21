@@ -13,6 +13,7 @@
 import pkg_resources
 import re
 from fnmatch import fnmatchcase
+from functools import partial
 
 from datetime import datetime
 
@@ -29,7 +30,6 @@ from trac.resource import Resource, ResourceSystem, get_resource_description
 from trac.resource import get_resource_url, resource_exists
 from trac.ticket.api import IMilestoneChangeListener
 from trac.util import as_int, get_reporter_id
-from trac.util.compat import partial
 from trac.util.datefmt import format_datetime, to_datetime, to_utimestamp, utc
 from trac.util.text import to_unicode
 from trac.util.translation import domain_functions
@@ -37,6 +37,8 @@ from trac.web.api import IRequestFilter, IRequestHandler
 from trac.web.chrome import Chrome, ITemplateProvider
 from trac.web.chrome import add_notice, add_script, add_stylesheet
 from trac.wiki.api import IWikiChangeListener, IWikiMacroProvider, parse_args
+
+import tracvote.compat
 
 _, add_domain, tag_ = domain_functions('tracvote', ('_', 'add_domain', 'tag_'))
 
@@ -136,17 +138,16 @@ class VoteSystem(Component):
         ]
     # Database schema version identifier, used for automatic upgrades.
     schema_version = 2
+    schema_version_key = 'vote_version'
 
     # Default database values
     # (table, (column1, column2), ((row1col1, row1col2), (row2col1, row2col2)))
-    db_data = (
+    db_data = [
         ('permission',
             ('username', 'action'),
                 (('anonymous', 'VOTE_VIEW'),
                  ('authenticated', 'VOTE_MODIFY'))),
-        ('system',
-            ('name', 'value'),
-                (('vote_version', str(schema_version)),)))
+    ]
 
     voteable_paths = ListOption('vote', 'paths', '/ticket*,/wiki*',
         doc="List of URL paths to allow voting on. Globs are supported.",
@@ -521,7 +522,7 @@ class VoteSystem(Component):
     # IEnvironmentSetupParticipant methods
 
     def environment_created(self):
-        pass
+        self.upgrade_environment()
 
     def environment_needs_upgrade(self, db=None):
         schema_ver = self.get_schema_version()
@@ -537,71 +538,36 @@ class VoteSystem(Component):
         """Each schema version should have its own upgrade module, named
         upgrades/dbN.py, where 'N' is the version number (int).
         """
-        db_mgr = DatabaseManager(self.env)
-        schema_ver = self.get_schema_version()
-
-        with self.env.db_transaction as db:
-            cursor = db.cursor()
-            # Is this a new installation?
-            if not schema_ver:
-                # Perform a single-step install: Create plugin schema and
-                # insert default data into the database.
-                connector = db_mgr.get_connector()[0]
-                for table in self.schema:
-                    for stmt in connector.to_sql(table):
-                        self.env.log.debug(stmt)
-                        cursor.execute(stmt)
-                for table, cols, vals in self.db_data:
-                    cursor.executemany("INSERT INTO %s (%s) VALUES (%s)"
-                                       % (table, ','.join(cols),
-                                          ','.join('%s' for c in cols)), vals)
-            elif schema_ver < self.schema_version:
-                # Perform incremental upgrades.
-                for i in range(schema_ver + 1, self.schema_version + 1):
-                    name = 'db%i' % i
-                    try:
-                        upgrades = __import__('tracvote.upgrades', globals(),
-                                              locals(), [name])
-                        script = getattr(upgrades, name)
-                    except AttributeError:
-                        raise TracError(_("No upgrade module for version "
-                                          "%(num)i (%(version)s.py)",
-                                          num=i, version=name))
-                    script.do_upgrade(self.env, i, cursor)
-            else:
-                # Obsolete call handled gracefully.
-                return
-            cursor.execute("""
-                UPDATE system
-                   SET value=%s
-                 WHERE name='vote_version'
-                """, (self.schema_version,))
-        self.log.info("Upgraded VotePlugin db schema from version %d to %d",
-                      schema_ver, self.schema_version)
+        dbm = DatabaseManager(self.env)
+        schema_version = self.get_schema_version()
+        if not schema_version:
+            with self.env.db_transaction:
+                dbm.create_tables(self.schema)
+                dbm.set_database_version(self.schema_version,
+                                         self.schema_version_key)
+                dbm.insert_into_tables(self.db_data)
+        else:
+            # Care for pre-tracvote-0.2 installations.
+            if schema_version == 1:
+                dbm.set_database_version(1, self.schema_version_key)
+            dbm.upgrade(self.schema_version, self.schema_version_key,
+                        'tracvote.upgrades')
 
     # Internal methods
 
     def get_schema_version(self):
         """Return the current schema version for this plugin."""
-        schema_ver = 0
-        with self.env.db_query as db:
-            for value, in db("""
-                SELECT value
-                  FROM system
-                 WHERE name='vote_version'
-            """):
-                schema_ver = int(value)
-            if schema_ver > 1:
-                # The expected outcome for any recent installation.
-                return schema_ver
-            # Care for pre-tracvote-0.2 installations.
-            dburi = self.config.get('trac', 'database')
-            cursor = db.cursor()
-            tables = self._get_tables(dburi, cursor)
-            if 'votes' in tables:
-                return 1
-            # This is a new installation.
-            return 0
+        dbm = DatabaseManager(self.env)
+        schema_ver = dbm.get_database_version('vote_version')
+        if schema_ver > 1:
+            # The expected outcome for any recent installation.
+            return schema_ver
+        # Care for pre-tracvote-0.2 installations.
+        tables = dbm.get_table_names()
+        if 'votes' in tables:
+            return 1
+        # This is a new installation.
+        return 0
 
     def render_voter(self, req):
         path = req.path_info.strip('/')
@@ -646,26 +612,3 @@ class VoteSystem(Component):
         else:
             count_detail = ''
         return '%+i' % total, _("Vote count%(detail)s", detail=count_detail)
-
-    def _get_tables(self, dburi, cursor):
-        """Code from TracMigratePlugin by Jun Omae (see tracmigrate.admin)."""
-        if dburi.startswith('sqlite:'):
-            sql = """
-                SELECT name
-                  FROM sqlite_master
-                 WHERE type='table'
-                   AND NOT name='sqlite_sequence'
-            """
-        elif dburi.startswith('postgres:'):
-            sql = """
-                SELECT tablename
-                  FROM pg_tables
-                 WHERE schemaname = ANY (current_schemas(false))
-            """
-        elif dburi.startswith('mysql:'):
-            sql = "SHOW TABLES"
-        else:
-            raise TracError(_('Unsupported database type "%s"')
-                            % dburi.split(':')[0])
-        cursor.execute(sql)
-        return sorted(row[0] for row in cursor)
