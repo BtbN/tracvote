@@ -418,7 +418,7 @@ class VoteSystem(Component):
         """Called whenever a new Wiki page is added."""
         pass
 
-    def wiki_page_changed(self, page, version, t, comment, author, ipnr):
+    def wiki_page_changed(self, page, version, t, comment, author, ipnr=None):
         """Called when a page has been modified."""
         pass
 
