@@ -10,6 +10,8 @@
 
 # Methods backported from Trac 1.2
 
+from __future__ import with_statement
+
 from trac.core import TracError
 from trac.db.api import DatabaseManager
 from trac.db.schema import Table

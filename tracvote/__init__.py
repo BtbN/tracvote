@@ -10,6 +10,8 @@
 # This software is licensed as described in the file COPYING, which
 # you should have received as part of this distribution.
 
+from __future__ import with_statement
+
 import pkg_resources
 import re
 from fnmatch import fnmatchcase

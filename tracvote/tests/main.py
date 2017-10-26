@@ -7,11 +7,15 @@
 # This software is licensed as described in the file COPYING, which
 # you should have received as part of this distribution.
 
+from __future__ import with_statement
+
+import pkg_resources
 import shutil
 import tempfile
 import unittest
 
-from trac.db import Table, Column, Index
+from trac import __version__ as VERSION
+from trac.db import Column, Table
 from trac.db.api import DatabaseManager, get_column_names
 from trac.perm import PermissionCache, PermissionSystem
 from trac.resource import Resource
@@ -19,10 +23,15 @@ from trac.test import EnvironmentStub, Mock, locale_en
 from trac.ticket.model import Ticket
 from trac.ticket.web_ui import TicketModule
 from trac.util.datefmt import utc
-from trac.web.api import HTTPForbidden, HTTPInternalError, RequestDone
+from trac.web.api import HTTPForbidden, HTTPNotFound, RequestDone
 from trac.web.chrome import Chrome
 from trac.web.main import RequestDispatcher
 from trac.wiki.model import WikiPage
+
+try:
+    from trac.web.api import HTTPInternalServerError as HTTPInternalError
+except ImportError:
+    from trac.web.api import HTTPInternalError
 
 from tracvote import VoteSystem, resource_from_path
 
@@ -39,6 +48,7 @@ class EnvironmentSetupTestCase(unittest.TestCase):
         self.votes = VoteSystem(self.env)
 
     def tearDown(self):
+        self.env.reset_db()
         # Really close db connections.
         self.env.shutdown()
         shutil.rmtree(self.env.path)
@@ -99,8 +109,8 @@ class EnvironmentSetupTestCase(unittest.TestCase):
                 Column('resource'),
                 Column('username'),
                 Column('vote', 'int'),
-                ]
             ]
+        ]
         self._schema_init(schema)
 
         # Populate tables with test data.
@@ -120,7 +130,10 @@ class EnvironmentSetupTestCase(unittest.TestCase):
             t.insert()
             w = WikiPage(self.env, 'ExistingPage')
             w.text = 'content'
-            w.save('author', 'comment', '::1')
+            if VERSION < pkg_resources.parse_version('1.0.3'):
+                w.save('author', 'comment', '::1')
+            else:
+                w.save('author', 'comment')
             self._verify_schema_unregistered()
             self.assertEquals(1, self.votes.get_schema_version())
             self.assertTrue(self.votes.environment_needs_upgrade())
@@ -171,19 +184,28 @@ class VoteSystemTestCase(unittest.TestCase):
     # Helpers
 
     def create_request(self, authname='anonymous', **kwargs):
-        kw = {'perm': PermissionCache(self.env, authname), 'args': {},
-              'callbacks': {}, 'path_info': '', 'form_token': None,
-              'href': self.env.href, 'abs_href': self.env.abs_href,
-              'tz': utc, 'locale': None, 'lc_time': locale_en,
-              'session': {},
-              'authname': authname, 'chrome': {'notices': [], 'warnings': []},
-              'method': None, 'get_header': lambda v: None, 'is_xhr': False}
-        kw.update(kwargs)
+        try:
+            from trac.test import MockRequest
+        except ImportError:
+            kw = {
+                'perm': PermissionCache(self.env, authname), 'args': {},
+                'callbacks': {}, 'path_info': '', 'form_token': None,
+                'href': self.env.href, 'abs_href': self.env.abs_href,
+                'tz': utc, 'locale': None, 'lc_time': locale_en,
+                'session': {},
+                'authname': authname,
+                'chrome': {'notices': [], 'warnings': []},
+                'method': None, 'get_header': lambda v: None,
+                'is_xhr': False
+            }
+            kw.update(kwargs)
 
-        def send(self, content, content_type='text/html', status=200):
-            raise RequestDone
+            def send(self, content, content_type='text/html', status=200):
+                raise RequestDone
 
-        return Mock(send=send, **kw)
+            return Mock(send=send, **kw)
+        else:
+            return MockRequest(self.env, authname=authname, **kwargs)
 
     def _revert_schema_init(self):
         with self.env.db_transaction as db:
@@ -208,13 +230,13 @@ class VoteSystemTestCase(unittest.TestCase):
 
     def test_voter_rendered_on_ticket(self):
         """Voter rendered when viewing ticket with VOTE_VIEW."""
-        TicketModule(self.env)
-        Ticket(self.env).insert()
         PermissionSystem(self.env).grant_permission('user', 'TICKET_VIEW')
+        Ticket(self.env).insert()
 
         req = self.create_request('user', path_info='/ticket/1', method='GET')
         dispatcher = RequestDispatcher(self.env)
 
+        self.assertEqual('user', req.authname)
         self.assertRaises(RequestDone, dispatcher.dispatch, req)
         found = False
         for elem in req.chrome.get('ctxtnav', []):
@@ -250,6 +272,7 @@ class VoteSystemTestCase(unittest.TestCase):
                              unicode(e))
         else:
             self.fail("TracError not raised.")
+
 
 class ResourceFromPathTestCase(unittest.TestCase):
 
