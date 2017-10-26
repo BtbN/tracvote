@@ -23,7 +23,7 @@ from trac.test import EnvironmentStub, Mock, locale_en
 from trac.ticket.model import Ticket
 from trac.ticket.web_ui import TicketModule
 from trac.util.datefmt import utc
-from trac.web.api import HTTPForbidden, HTTPNotFound, RequestDone
+from trac.web.api import HTTPForbidden, RequestDone
 from trac.web.chrome import Chrome
 from trac.web.main import RequestDispatcher
 from trac.wiki.model import WikiPage
