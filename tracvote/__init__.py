@@ -125,7 +125,7 @@ class VoteSystem(Component):
                   0: ('aupgray.png', 'adowngray.png'),
                  +1: ('aupmod.png', 'adowngray.png')}
 
-    path_re = re.compile(r'/vote/(up|down)/(.*)')
+    path_re = re.compile(r'/vote/(up|down)/([^/]+)/?(.*)')
 
     schema = [
         Table('votes', key=('realm', 'resource_id', 'username', 'vote'))[
@@ -347,13 +347,16 @@ class VoteSystem(Component):
         match = self.path_re.match(req.path_info)
         if match:
             req.args['vote'] = match.group(1)
-            req.args['path'] = match.group(2)
+            req.args['realm'] = match.group(2)
+            req.args['id'] = match.group(3)
             return True
 
     def process_request(self, req):
-        vote, path = req.args.get('vote'), req.args.get('path')
-        resource = resource_from_path(self.env, path)
-        if resource is None:
+        vote = req.args.get('vote')
+        resource = Resource(req.args.get('realm'), req.args.get('id'),
+                            req.args.get('version'))
+        if not any(resource.realm == realm
+                   for realm in ResourceSystem(self.env).get_known_realms()):
             raise TracError(_("Invalid request path. Path does not "
                               "contain a valid realm."))
         req.perm(resource).require('VOTE_MODIFY')
@@ -400,9 +403,10 @@ class VoteSystem(Component):
         if template is not None:
             for path in self.voteable_paths:
                 if fnmatchcase(req.path_info, path):
-                    resource = resource_from_path(self.env, req.path_info)
-                    if resource and 'VOTE_VIEW' in req.perm(resource):
-                        self.render_voter(req)
+                    context = data.get('context')
+                    if context and context.resource and \
+                            'VOTE_VIEW' in req.perm(context.resource):
+                        self.render_voter(req, context.resource)
                         break
         return template, data, content_type
 
@@ -571,9 +575,7 @@ class VoteSystem(Component):
         # This is a new installation.
         return 0
 
-    def render_voter(self, req):
-        path = req.path_info.strip('/')
-        resource = resource_from_path(self.env, path)
+    def render_voter(self, req, resource):
         vote = resource and self.get_vote(req, resource) or 0
         up = tag.img(src=req.href.chrome('vote/' + self.image_map[vote][0]),
                      alt=_("Up-vote"))
@@ -583,11 +585,15 @@ class VoteSystem(Component):
                 'VOTE_MODIFY' in req.perm(resource) and \
                 get_reporter_id(req) != 'anonymous':
             down = tag.a(down, id='downvote',
-                         href=req.href.vote('down', path,
+                         href=req.href.vote('down', resource.realm,
+                                            resource.id,
+                                            version=resource.version,
                                             token=req.form_token),
                          title=_("Down-vote"))
             up = tag.a(up, id='upvote',
-                       href=req.href.vote('up', path, token=req.form_token),
+                       href=req.href.vote('up', resource.realm, resource.id,
+                                          version=resource.version,
+                                          token=req.form_token),
                        title=_("Up-vote"))
             add_script(req, 'vote/js/tracvote.js')
             shown = req.session.get('shown_vote_message')
