@@ -286,11 +286,11 @@ class ResourceFromPathTestCase(unittest.TestCase):
 
     def test_ticket_resource_not_exists(self):
         resource = resource_from_path(self.env, '/ticket/2')
-        self.assertIsNone(resource)
+        self.assertEqual(None, resource)
 
     def test_ticket_resource_invalid(self):
         resource = resource_from_path(self.env, '/ticket/a')
-        self.assertIsNone(resource)
+        self.assertEqual(None, resource)
 
 
 def suite():
