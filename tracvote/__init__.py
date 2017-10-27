@@ -19,8 +19,6 @@ from functools import partial
 
 from datetime import datetime
 
-from genshi import Markup
-from genshi.builder import tag
 from pkg_resources import resource_filename
 
 from trac.config import ListOption
@@ -33,6 +31,7 @@ from trac.resource import get_resource_url, resource_exists
 from trac.ticket.api import IMilestoneChangeListener
 from trac.util import as_int, get_reporter_id
 from trac.util.datefmt import format_datetime, to_datetime, to_utimestamp, utc
+from trac.util.html import Markup, html as tag
 from trac.util.text import to_unicode
 from trac.util.translation import domain_functions
 from trac.web.api import IRequestFilter, IRequestHandler
