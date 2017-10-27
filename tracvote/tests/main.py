@@ -130,7 +130,8 @@ class EnvironmentSetupTestCase(unittest.TestCase):
             t.insert()
             w = WikiPage(self.env, 'ExistingPage')
             w.text = 'content'
-            if VERSION < pkg_resources.parse_version('1.0.3'):
+            if pkg_resources.parse_version(VERSION) < \
+                    pkg_resources.parse_version('1.0.3'):
                 w.save('author', 'comment', '::1')
             else:
                 w.save('author', 'comment')
