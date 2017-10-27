@@ -1,4 +1,4 @@
-$(document).ready(function() {
+jQuery(function($) {
   $('#upvote, #downvote').click(function() {
     var button = this;
     var href;
