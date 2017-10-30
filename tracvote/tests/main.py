@@ -33,7 +33,8 @@ try:
 except ImportError:
     from trac.web.api import HTTPInternalError
 
-from tracvote import VoteSystem, resource_from_path
+from tracvote import VoteSystem
+from tracvote.upgrades.db2 import resource_from_path
 
 
 _ACTIONS = dict(view='VOTE_VIEW', modify='VOTE_MODIFY')

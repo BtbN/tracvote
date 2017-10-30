@@ -9,9 +9,8 @@
 
 import re
 
-from trac.db import Table, Column, Index, DatabaseManager
-
-from tracvote import resource_from_path
+from trac.db import Table, Column, DatabaseManager
+from trac.resource import Resource, ResourceSystem, resource_exists
 
 
 schema = [
@@ -25,6 +24,58 @@ schema = [
         Column('changetime', type='int64'),
         ]
     ]
+
+
+def get_versioned_resource(env, resource):
+    """Find the current version for a Trac resource.
+
+    Because versioned resources with no version value default to 'latest',
+    the current version has to be retrieved separately.
+    """
+    realm = resource.realm
+    if realm == 'ticket':
+        for count, in env.db_query("""
+                SELECT COUNT(DISTINCT time)
+                FROM ticket_change WHERE ticket=%s
+                """, (resource.id,)):
+            if count != 0:
+                resource.version = count
+    elif realm == 'wiki':
+        for version, in env.db_query("""
+                SELECT version
+                  FROM wiki
+                 WHERE name=%s
+                 ORDER BY version DESC LIMIT 1
+                """, (resource.id,)):
+            resource.version = version
+    return resource
+
+
+def _resource_exists(env, resource):
+    """Avoid exception in database for Trac < 1.0.7.
+    http://trac.edgewall.org/ticket/12076
+    """
+    try:
+        return resource_exists(env, resource)
+    except env.db_exc.DatabaseError:
+        return False
+
+
+def resource_from_path(env, path):
+    """Find realm and resource ID from resource URL.
+
+    Assuming simple resource paths to convert to Trac resource identifiers.
+    """
+    path = path.strip('/')
+    # Special-case: Default TracWiki start page.
+    if path == 'wiki':
+        path += '/WikiStart'
+    for realm in ResourceSystem(env).get_known_realms():
+        if path.startswith(realm):
+            resource_id = re.sub(realm, '', path, 1).lstrip('/')
+            resource = Resource(realm, resource_id)
+            if _resource_exists(env, resource) in (None, True):
+                return get_versioned_resource(env, resource)
 
 
 def do_upgrade(env, ver, cursor):
