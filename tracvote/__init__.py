@@ -130,7 +130,7 @@ class VoteSystem(Component):
                       FROM votes
                      WHERE realm=%s
                        AND resource_id=%s
-                    """, (resource.realm, resource.id)):
+                    """, (resource.realm, to_unicode(resource.id))):
                 total = sum_vote
             for sum_vote, in db("""
                     SELECT sum(vote)
@@ -138,7 +138,7 @@ class VoteSystem(Component):
                      WHERE vote < 0
                        AND realm=%s
                        AND resource_id=%s
-                    """, (resource.realm, resource.id)):
+                    """, (resource.realm, to_unicode(resource.id))):
                 negative = sum_vote
             for sum_vote, in db("""
                     SELECT sum(vote)
