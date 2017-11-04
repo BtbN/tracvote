@@ -199,7 +199,7 @@ class VoteSystem(Component):
 
     def delete_votes(self, resource):
         """Delete votes for a resource."""
-        args = list((resource.realm, to_unicode(resource.id)))
+        args = [resource.realm, to_unicode(resource.id)]
         if resource.version:
             args.append(resource.version)
         self.env.db_transaction("""
