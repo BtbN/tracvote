@@ -49,6 +49,7 @@ setup(
     zip_safe=True,
     install_requires=['Trac'],
     description='A plugin for voting on Trac resources.',
+    classifiers=['Framework :: Trac'],
     entry_points={'trac.plugins': ['tracvote = tracvote']},
     **extra
 )
