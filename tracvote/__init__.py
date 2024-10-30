@@ -333,7 +333,7 @@ class VoteSystem(Component):
                           (req.href.chrome('vote/' + self.image_map[vote][0]),
                            req.href.chrome('vote/' + self.image_map[vote][1]),
                            body, title))
-            if isinstance(content, unicode):
+            if isinstance(content, str):
                 content = content.encode('utf-8')
             req.send(content)
 
